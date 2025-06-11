@@ -8,7 +8,13 @@
 \usepackage{listings}
 \usepackage{enumitem}
 
-% Configuring code listing style for C
+\lefthyphenmin=1
+\hyphenpenalty=100
+\tolerance=11000
+\emergencystretch=1em
+\hfuzz=2pt
+\vfuzz=2pt
+
 \lstset{
     language=C,
     basicstyle=\footnotesize\ttfamily,
@@ -88,7 +94,7 @@ Zero-copy is achieved via \texttt{sendmsg}/\texttt{recvmsg} with \texttt{struct 
 \subsection{Session and Presentation Layers (OSI Layers 5--6)}
 \begin{itemize}
     \item \textbf{Session}: Server tracks JUs in \texttt{JUState} (IP address, JU address, NPGs). Initial entry establishes sessions, sequence numbers prevent duplicates.
-    \item \textbf{Presentation}: J-series messages are serialized/deserialized via \texttt{jmessage\_serialize}/\texttt{jmessage\_deserialize} (ISO/IEC 8823 \cite{iso8823}).
+    \item \textbf{Presentation}: J-series messages are serialized/deserialized \\ via \texttt{jmessage\_serialize}/\texttt{jmessage\_deserialize} (ISO/IEC 8823 \cite{iso8823}).
 \end{itemize}
 
 \subsection{Application Layer (OSI Layer 7)}
@@ -146,13 +152,16 @@ Key features:
 \subsection{Client (\texttt{f16.c})}
 \begin{lstlisting}[caption={Client Message Sending}, label={lst:client}]
 if (current_slot % 100 == 0) {
-    jmessage_init(&msg, J_MSG_SURVEILLANCE, JU_ADDRESS, SURVEILLANCE_NPG, DEFAULT_NET);
+    jmessage_init(&msg, J_MSG_SURVEILLANCE,
+       JU_ADDRESS, SURVEILLANCE_NPG, DEFAULT_NET);
     char data[64];
-    snprintf(data, sizeof(data), "Track: F-16, Lat:50.%d, Lon:10.%d", message_count, message_count);
+    snprintf(data, sizeof(data), "Track: F-16, Lat:50.%d, Lon:10.%d",
+        message_count, message_count);
     jmessage_set_data(&msg, (uint8_t *)data, strlen(data) + 1);
     int len = jmessage_serialize(&msg, buffer, MAX_BUFFER);
     if (len > 0) {
-        sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
+        sendto(sock_fd, buffer, len, 0,
+            (struct sockaddr *)&server_addr, sizeof(server_addr));
     }
 }
 \end{lstlisting}
@@ -166,12 +175,12 @@ Key features:
 
 \subsection{Non-Blocking}
 Non-blocking facilities are critical for real-time performance. Verification methods include:
+\begin{lstlisting}[caption={Strace Output for Server}]
+  epoll_wait(4, [{events=EPOLLIN, data={u32=3, u64=3}}], 10, -1) = 1
+  recvmsg(3, {msg_name={sa_family=AF_INET, ...}, msg_namelen=16, ...}, 0) = 64
+\end{lstlisting}
 \begin{itemize}
     \item \textbf{System Call Tracing}: Using \texttt{strace}, confirmed no blocking calls:
-        \begin{lstlisting}[caption={Strace Output for Server}]
-        epoll_wait(4, [{events=EPOLLIN, data={u32=3, u64=3}}], 10, -1) = 1
-        recvmsg(3, {msg_name={sa_family=AF_INET, ...}, msg_namelen=16, ...}, 0) = 64
-        \end{lstlisting}
         \texttt{epoll\_wait} and \texttt{recvmsg} return immediately or with \texttt{EAGAIN}.
     \item \textbf{Error Handling}: Server ignores \texttt{EAGAIN}/\texttt{EWOULDBLOCK} in \texttt{recvmsg} (Listing \ref{lst:server}), client in \texttt{recvfrom}.
     \item \textbf{Performance Metrics}: Tested with \texttt{perf} on a 12-core system (TRISTELLAR-Z690, Ubuntu):
@@ -227,5 +236,6 @@ This non-blocking C implementation of a Link 16 SOA demonstrates a lightweight, 
 \bibitem{iso14766} International Organization for Standardization, ``ISO/IEC 14766:1997 Information technology — Open Distributed Processing — Reference model: Overview,'' 1997.
 
 \end{thebibliography}
+
 
 \end{document}
