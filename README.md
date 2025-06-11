@@ -38,7 +38,7 @@ Handling
 --------
 
 * NPG 1: Process slot_request (type 3) to assign TDMA slots; key_exchange (type 2) for security.
-* NPG 6: Handle status (type 5) for PLI, updating NodeState.position and NodeState.velocity for neighbor discovery.
+* NPG 6: Handle status (type 5) for PLI, updating position and velocity for neighbor discovery.
 * NPG 7: Forward status (type 5) sensor data to subscribers (e.g., command posts).
 * NPG 29: Relay chat (type 0) and ack (type 1) for TacChat.
 * NPG 100: Process waypoint (type 4) and formation (type 6) for C2.
