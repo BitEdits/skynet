@@ -8,7 +8,7 @@ Message
 // SkyNetMessage structure (from project scope)
 typedef struct {
     uint8_t version;      // 1
-    uint8_t type;         // 0=chat, 1=ack, 2=key_exchange, 3=slot_request, 4=waypoint, 5=status, 6=formation
+    uint8_t type;         // 0=chat, 1=ack, 2=key, 3=slot, 4=waypoint, 5=status, 6=formation
     uint32_t npg_id;      // NPG/swarm_id (1–1000)
     uint32_t node_id;     // Unique node ID
     uint32_t seq_no;      // Deduplication
