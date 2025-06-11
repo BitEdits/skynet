@@ -25,7 +25,7 @@ Network Management:
 * J1.4   Communication Status
 * J1.5   Net Control Initialization
 * J1.6   Needline Participation
-*        Group Assignment
+* ()     Group Assignment
 
 Precise Participant Location and Identification
 * J2.0   Indirect Interface Unit PPLI
