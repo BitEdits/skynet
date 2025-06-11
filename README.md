@@ -160,7 +160,7 @@ Aircrafts
 * Rafale
 * R-99
 * RC-135 Rivet Joint
-* S 100B Argus
+* S 100B Argus (Saab 340 AEW&C) (ASC 890)
 * Sea King Mk 7 ASaC
 * Tornado
 
