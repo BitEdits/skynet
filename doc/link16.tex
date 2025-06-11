@@ -164,7 +164,7 @@ Key features:
     \item Non-blocking: \texttt{select} with 1 ms timeout.
 \end{itemize}
 
-\subsection{Non-Blocking Verification}
+\subsection{Non-Blocking}
 Non-blocking facilities are critical for real-time performance. Verification methods include:
 \begin{itemize}
     \item \textbf{System Call Tracing}: Using \texttt{strace}, confirmed no blocking calls:
@@ -181,23 +181,6 @@ Non-blocking facilities are critical for real-time performance. Verification met
         \end{itemize}
     \item \textbf{TDMA Precision}: \texttt{timerfd} ensures 7.8125 ms slots (±1 µs jitter, verified with \texttt{clock\_gettime}).
 \end{itemize}
-
-\subsection{Multicast Loopback Resolution}
-An initial issue caused a message storm due to multicast loopback:
-\begin{itemize}
-    \item Server sent messages to 239.255.0.7, received them back (\texttt{IP\_MULTICAST\_LOOP=1}).
-    \item Messages were reprocessed, creating a feedback loop.
-\end{itemize}
-Resolved by:
-\begin{itemize}
-    \item Disabling loopback: %\texttt{setsockopt(socket_fd, IPPROTO_IP, IP_MULTICAST_LOOP, &opt, sizeof(opt))} with \texttt{opt=0}.
-    \item Sequence tracking: % \texttt{MessageSeq} array stores \texttt{ju_address}, \texttt{sequence}, checked by \texttt{is\_duplicate}.
-\end{itemize}
-Post-fix, a single surveillance message is processed once, verified via server logs:
-\begin{lstlisting}
-Received message from JU 00002, type: 7, NPG: 7
-Sent to NPG 7 multicast 239.255.0.7
-\end{lstlisting}
 
 \subsection{ISO Standards Compliance}
 The implementation aligns with:
