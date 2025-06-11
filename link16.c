@@ -32,7 +32,7 @@
 #define MAX_BUFFER 1024
 #define JU_ADDRESS_BASE 00001
 #define TIME_SLOT_INTERVAL_US 7812 /* 7.8125 ms */
-#define THREAD_COUNT 4
+#define THREAD_COUNT 12
 #define QUEUE_SIZE 1024
 #define MAX_SEQUENCES 64
 #define MAX_EVENTS 32
@@ -63,12 +63,6 @@ typedef struct {
 } JUState;
 
 typedef struct {
-    ServerState *server;
-    int worker_id;
-    int epoll_fd;
-} WorkerState;
-
-typedef struct {
     JUState jus[MAX_JUS];
     atomic_uint ju_count;
     uint32_t current_slot;
@@ -85,9 +79,22 @@ typedef struct {
     atomic_int timer_active;
 } ServerState;
 
+typedef struct {
+    ServerState *server;
+    int worker_id;
+    int epoll_fd;
+} WorkerState;
+
 static uint64_t get_time_us(void) {
     struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    if (clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0) {
+        return (uint64_t)ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL;
+    }
+    /* Fallback to CLOCK_MONOTONIC */
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0) {
+        perror("clock_gettime failed");
+        return 0;
+    }
     return (uint64_t)ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL;
 }
 
@@ -149,13 +156,6 @@ int set_non_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) return -1;
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
-void set_realtime_priority() {
-    struct sched_param param = { .sched_priority = 99 };
-    if (sched_setscheduler(0, SCHED_FIFO, &param) < 0) {
-        perror("Set real-time scheduling failed");
-    }
 }
 
 void pin_thread(int core_id) {
@@ -373,7 +373,6 @@ void *worker_thread(void *arg) {
     int worker_id = ws->worker_id;
     int epoll_fd = ws->epoll_fd;
     pin_thread(worker_id);
-    set_realtime_priority();
 #ifdef NUMA_AVAILABLE
     if (numa_available() >= 0) {
         numa_set_preferred(numa_node_of_cpu(worker_id % sysconf(_SC_NPROCESSORS_ONLN)));
@@ -409,7 +408,6 @@ void *worker_thread(void *arg) {
 int main() {
     ServerState state;
     server_init(&state);
-    set_realtime_priority();
     pin_thread(0);
 #ifdef NUMA_AVAILABLE
     if (numa_available() >= 0) {
@@ -496,7 +494,7 @@ int main() {
         close(state.socket_fd);
         exit(1);
     }
-    state.timer_fd = timerfd_create(CLOCK_MONOTONIC_RAW, TFD_NONBLOCK);
+    state.timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     if (state.timer_fd == -1) {
         perror("Timerfd creation failed");
         close(state.epoll_fd);
