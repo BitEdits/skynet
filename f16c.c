@@ -1,3 +1,5 @@
+// gcc -o f16c f16c.c j-msg.c
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
