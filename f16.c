@@ -104,7 +104,7 @@ int main() {
                     if (sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&surveillance_addr, sizeof(surveillance_addr)) < 0) {
                         perror("Send surveillance failed");
                     } else {
-                        printf("Sent surveillance message: %s, slot %u\n", data, msg.time_slot);
+                        jmessage_print(&msg);
                         message_count++;
                     }
                 } else {

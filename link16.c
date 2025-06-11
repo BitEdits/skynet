@@ -1,5 +1,4 @@
-// sudo apt-get install libnuma-dev
-// gcc -o link16 link16.c j-msg.c -pthread -lnuma -lrt
+// gcc -o link16 link16.c j-msg.c -pthread
 
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
@@ -20,9 +19,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
-#ifdef NUMA_AVAILABLE
-#include <numa.h>
-#endif
 #include <stdatomic.h>
 #include <net/if.h>
 #include "j-msg.h"
@@ -306,8 +302,8 @@ void send_to_npg(ServerState *state, const JMessage *msg, uint64_t recv_time) {
             perror("Sendmsg failed");
         }
     } else {
-        printf("Sent to NPG %d multicast %s, seq %u, latency %llu us\n",
-               msg->npg, mcast_ip, msg->time_slot, send_time - recv_time);
+        printf("SENT [NPG:%d][seq:%u][multicast:%s] latency [us:%llu]\n",
+               msg->npg, msg->time_slot, mcast_ip, send_time - recv_time);
         record_sequence(state, msg->ju_address, msg->time_slot);
     }
 }
@@ -343,8 +339,8 @@ void handle_message(ServerState *state, JUState *ju, JMessage *msg, uint64_t rec
     if (is_duplicate(state, msg->ju_address, msg->time_slot, msg->type, &ju->addr)) {
         return;
     }
-    printf("Received message from JU %05o, type: %d, NPG: %d, seq: %u, src: %s:%d, latency %llu us\n",
-           ju->ju_address, msg->type, msg->npg, msg->time_slot,
+    printf("RCVD [NPG:%d][seq:%u][ju:%05o][type:%d][src:%s:%d] latency [us:%llu]\n",
+           msg->npg, msg->time_slot, ju->ju_address, msg->type,
            inet_ntoa(ju->addr.sin_addr), ntohs(ju->addr.sin_port), process_time - recv_time);
     switch (msg->type) {
         case J_MSG_INITIAL_ENTRY:
@@ -373,11 +369,7 @@ void *worker_thread(void *arg) {
     int worker_id = ws->worker_id;
     int epoll_fd = ws->epoll_fd;
     pin_thread(worker_id);
-#ifdef NUMA_AVAILABLE
-    if (numa_available() >= 0) {
-        numa_set_preferred(numa_node_of_cpu(worker_id % sysconf(_SC_NPROCESSORS_ONLN)));
-    }
-#endif
+
     struct epoll_event events[1];
     while (atomic_load_explicit(&state->running, memory_order_acquire)) {
         int nfds = epoll_wait(epoll_fd, events, 1, -1);
@@ -409,11 +401,7 @@ int main() {
     ServerState state;
     server_init(&state);
     pin_thread(0);
-#ifdef NUMA_AVAILABLE
-    if (numa_available() >= 0) {
-        numa_set_preferred(0);
-    }
-#endif
+
     state.socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (state.socket_fd == -1) {
         perror("Socket creation failed");
@@ -531,7 +519,7 @@ int main() {
         }
         printf("Started worker thread %d\n", i);
     }
-    printf("Link 16 UDP server listening on port %d with %d worker threads...\n", PORT, THREAD_COUNT);
+    printf("Link 16 Multicast UDP server listening on port %d with %d worker threads...\n", PORT, THREAD_COUNT);
     struct epoll_event events[MAX_EVENTS];
     uint8_t buffer[MAX_BUFFER];
     struct iovec iov = { .iov_base = buffer, .iov_len = MAX_BUFFER };

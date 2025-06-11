@@ -91,7 +91,7 @@ int jmessage_deserialize(JMessage *msg, const uint8_t *buffer, size_t buffer_siz
 }
 
 void jmessage_print(const JMessage *msg) {
-    printf("JMessage: Type=%d, JU_Addr=%05o, NPG=%d, Net=%u, Slot=%u, Data_Len=%u, Data=%.*s\n",
-           msg->type, msg->ju_address, msg->npg, msg->net_number, msg->time_slot,
+    printf("JMSG [NPG:%d][seq:%d][JU:%05o][Type:%d][Net:%u][Slot:%u][len:%u][Data:%.*s]\n",
+           msg->npg, msg->time_slot,  msg->type, msg->ju_address, msg->net_number, msg->time_slot,
            msg->data_length, msg->data_length, msg->data);
 }
