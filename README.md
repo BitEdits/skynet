@@ -1,26 +1,63 @@
-Link 16
-=======
+Skynet
+======
 
-NATO F-16 application layer protocol stack (TADIL-J):
+Message
+-------
 
-* PPLI, or Precise Participant Location and Identification (groups 5 and 6);
-* Surveillance (group 7);
-* Command (Mission Management/Weapons Coordination) (group 8);
-* (Aircraft) Control (group 9),
-* Electronic Warfare & Coordination (group 10).
+```
+// SkyNetMessage structure (from project scope)
+typedef struct {
+    uint8_t version;      // 1
+    uint8_t type;         // 0=chat, 1=ack, 2=key_exchange, 3=slot_request, 4=waypoint, 5=status, 6=formation
+    uint32_t npg_id;      // NPG/swarm_id (1–1000)
+    uint32_t node_id;     // Unique node ID
+    uint32_t seq_no;      // Deduplication
+    uint64_t timestamp;   // Relative time (us)
+    uint8_t qos;          // 0=chat, 1=PLI, 2=voice, 3=swarm_cmd
+    uint8_t hop_count;    // 0–3
+    uint8_t iv[16];       // AES-256-GCM IV
+    uint16_t payload_len; // 0–400 bytes
+    uint8_t payload[400]; // Encrypted: chat, PLI, waypoint, status, formation
+    uint8_t hmac[32];     // HMAC-SHA256
+    uint32_t crc;         // CRC-32
+} SkyNetMessage;
+```
 
-Features:
+Types
+-----
 
-* Use `epoll` for O(1) scalability with many JUs.
-* Use IP multicast groups for NPGs to reduce packet duplication.
-* Use `sendmsg/recvmsg` with scatter-gather I/O to minimize memory copies.
-* Set high-priority scheduling for timely TDMA slot processing.
-* Use `timerfd` for 7.8125 ms TDMA slots.
-* Pre-allocate buffers and use lock-free queues for message handling.
-* Pin threads to CPU cores and align memory to NUMA nodes.
-* Increase socket buffers, enable `SO_REUSEPORT`, and tweak kernel parameters.
-* Enable UDP checksum offloading.
-* Spawn N worker threads at startup to process J-messages requests in parallel.
+* 0: Chat
+* 1: Ack
+* 2: Key Exchange
+* 3: Slot Request
+* 4: Waypoint
+* 5: Status
+* 6: Formation
+
+Handling
+--------
+
+* NPG 1: Process slot_request (type 3) to assign TDMA slots; key_exchange (type 2) for security.
+* NPG 6: Handle status (type 5) for PLI, updating NodeState.position and NodeState.velocity for neighbor discovery.
+* NPG 7: Forward status (type 5) sensor data to subscribers (e.g., command posts).
+* NPG 29: Relay chat (type 0) and ack (type 1) for TacChat.
+* NPG 100: Process waypoint (type 4) and formation (type 6) for C2.
+* NPG 101: Broadcast status (type 5) alerts for self-healing.
+* NPG 102: Handle status (type 5) and chat (type 0) for logistics.
+* NPG 103: Relay chat (type 0), waypoint (type 4), and formation (type 6) for coordination.
+
+Subscriptions
+-------------
+
+* Infantry: NPGs 1, 29 (control, chat).
+* Drone: NPGs 1, 6, 7, 100, 101 (control, PLI, surveillance, C2, alerts).
+* Aircraft: NPGs 1, 6, 7, 100, 101, 103 (control, PLI, surveillance, C2, alerts, inter-agent).
+* Warship: NPGs 1, 7, 29, 102, 103 (control, surveillance, chat, logistics, inter-agent).
+* Platform: NPGs 1, 7, 29, 102 (control, surveillance, chat, logistics).
+* Train: NPGs 1, 6, 100, 102, 103 (control, PLI, C2, logistics, inter-agent).
+* Wheels: NPGs 1, 6, 29, 100, 102, 103 (control, PLI, chat, C2, logistics, inter-agent).
+* Relay: NPGs 1, 6, 101 (control, PLI, alerts).
+* Controller: NPGs 1, 6, 100, 101 (control, PLI, C2, alerts).
 
 J-Messages
 ----------
