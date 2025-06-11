@@ -9,6 +9,22 @@ NATO F-16 application layer protocol stack (TADIL-J):
 * (Aircraft) Control (group 9),
 * Electronic Warfare & Coordination (group 10).
 
+Features:
+
+* Use `epoll` for O(1) scalability with many JUs.
+* Use IP multicast groups for NPGs to reduce packet duplication.
+* Use `sendmsg/recvmsg` with scatter-gather I/O to minimize memory copies.
+* Set high-priority scheduling for timely TDMA slot processing.
+* Use `timerfd` for 7.8125 ms TDMA slots.
+* Pre-allocate buffers and use lock-free queues for message handling.
+* Pin threads to CPU cores and align memory to NUMA nodes.
+* Increase socket buffers, enable `SO_REUSEPORT`, and tweak kernel parameters.
+* Enable UDP checksum offloading.
+* Spawn N worker threads at startup to process J-messages requests in parallel.
+
+J-Messages
+----------
+
 Network Management:
 * J0.0   Initial Entry
 * J0.1   Test
