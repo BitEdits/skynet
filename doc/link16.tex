@@ -26,13 +26,13 @@
 \maketitle
 
 \begin{abstract}
-This article presents a modest, high-performance, non-blocking C implementation of a Link 16 (TADIL J, MIL-STD-6016) tactical data link simulation within a Service-Oriented Architecture (SOA). The system comprises a server (\texttt{f16s.c}) and client (\texttt{f16c.c}), leveraging UDP multicast, \texttt{epoll}, and Time Division Multiple Access (TDMA) to emulate Joint Tactical Information Distribution System (JTIDS) terminals. Key features include zero-copy messaging, real-time scheduling, NUMA-aware processing, and a lock-free queue, ensuring low-latency and scalability. Non-blocking facilities are verified through system call analysis and performance metrics. The implementation aligns with ISO/IEC 18384 (SOA) and ISO/IEC 7498 (OSI), offering a lightweight solution for tactical network simulation. A multicast loopback issue causing message storms is resolved, enhancing reliability. This work is suitable for real-time, multicore environments, with applications in defense system prototyping.
+This article presents a modest, high-performance, non-blocking C implementation of a Link 16 (TADIL J, MIL-STD-6016) tactical data link simulation within a Service-Oriented Architecture (SOA). The system comprises a server (\texttt{link16.c}) and client (\texttt{f16.c}), leveraging UDP multicast, \texttt{epoll}, and Time Division Multiple Access (TDMA) to emulate Joint Tactical Information Distribution System (JTIDS) terminals. Key features include zero-copy messaging, real-time scheduling, NUMA-aware processing, and a lock-free queue, ensuring low-latency and scalability. Non-blocking facilities are verified through system call analysis and performance metrics. The implementation aligns with ISO/IEC 18384 (SOA) and ISO/IEC 7498 (OSI), offering a lightweight solution for tactical network simulation. A multicast loopback issue causing message storms is resolved, enhancing reliability. This work is suitable for real-time, multicore environments, with applications in defense system prototyping.
 \end{abstract}
 
 \tableofcontents
 
 \section{Introduction}
-Link 16, defined by MIL-STD-6016 \cite{milstd6016}, is a tactical data link protocol for secure, jam-resistant communication in military networks, using TDMA with 7.8125 ms slots and J-series messages for situational awareness \cite{ada404334}. This article describes a Service-Oriented Architecture (SOA) implementation in C, simulating a Link 16 network with a non-blocking server (\texttt{f16s.c}) and client (\texttt{f16c.c}). The system supports Pub/Sub, Control, and Messaging, mimicking JTIDS terminals on platforms like the F-16.
+Link 16, defined by MIL-STD-6016 \cite{milstd6016}, is a tactical data link protocol for secure, jam-resistant communication in military networks, using TDMA with 7.8125 ms slots and J-series messages for situational awareness \cite{ada404334}. This article describes a Service-Oriented Architecture (SOA) implementation in C, simulating a Link 16 network with a non-blocking server (\texttt{link16.c}) and client (\texttt{f16.c}). The system supports Pub/Sub, Control, and Messaging, mimicking JTIDS terminals on platforms like the F-16.
 
 The implementation is modest, using standard POSIX APIs, yet high-performance, incorporating:
 \begin{itemize}
@@ -213,7 +213,7 @@ The implementation aligns with:
 \section{Evaluation}
 The system was tested on a 12-core Alder Lake P-Core Linux system (TRISTELLAR-Z690, Ubuntu 22.04):
 \begin{itemize}
-    \item \textbf{Setup}: Server (\texttt{f16s}) and multiple clients (\texttt{f16c}) simulating JUs.
+    \item \textbf{Setup}: Server (\texttt{link16}) and multiple clients (\texttt{f16}) simulating JUs.
     \item \textbf{Results}:
         \begin{itemize}
             \item Single message processing: 50 µs average latency.
