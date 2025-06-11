@@ -6,8 +6,8 @@
 #include "j-msg.h"
 
 #define PORT 8080
-#define MAX_BUFFER 1000
-#define JU_ADDRESS 00002
+#define MAX_BUFFER 4096
+#define JU_ADDRESS 00001
 #define DEFAULT_NPG 7
 #define DEFAULT_NET 0
 
@@ -43,10 +43,8 @@ int main() {
     len = jmessage_serialize(&msg, buffer, MAX_BUFFER);
     if (len > 0) send(sock_fd, buffer, len, 0);
 
-    while (1) /* Receive and print messages */
     {
         len = recv(sock_fd, buffer, MAX_BUFFER, 0);
-        if (len <= 0) break;
         JMessage rx_msg;
         if (jmessage_deserialize(&rx_msg, buffer, len) >= 0) {
             jmessage_print(&rx_msg);
