@@ -26,16 +26,65 @@
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
 
-#define PORT 8080
-#define MAX_NODES 2000       // Support 1000 infantry nodes + 1000 drones (Phase II)
-#define MAX_BUFFER 1490      // Max SkyNetMessage size
-#define TIME_SLOT_INTERVAL_US 1000  // 1 ms TDMA slots (1,000 slots/s)
-#define THREAD_COUNT 4      // Fewer threads for Raspberry Pi
-#define QUEUE_SIZE 1024     // Message queue size
-#define MAX_SEQUENCES 64    // Deduplication table size
-#define MAX_EVENTS 32       // Epoll events
-#define PERCEPTION_RADIUS 5.0 // For drone neighbor discovery (meters)
-#define NEIGHBOR_TIMEOUT_US 500000 // 0.5 s timeout for neighbor removal
+#define PORT 6566                    // SkyNet Port
+#define MAX_NODES 2000               // Support 1000 infantry nodes + 1000 drones (Phase II)
+#define MAX_BUFFER 1490              // Max SkyNetMessage size
+#define TIME_SLOT_INTERVAL_US 1000   // 1 ms TDMA slots (1,000 slots/s)
+#define THREAD_COUNT 4               // Fewer threads for Raspberry Pi
+#define QUEUE_SIZE 1024              // Message queue size
+#define MAX_SEQUENCES 64             // Deduplication table size
+#define MAX_EVENTS 32                // Epoll events
+#define PERCEPTION_RADIUS 5.0        // For drone neighbor discovery (meters)
+#define NEIGHBOR_TIMEOUT_US 500000   // 0.5 s timeout for neighbor removal
+
+#define SKYNET_VERSION 1             /* Protocol version */
+#define SKYNET_MAX_NODES 100         /* Max nodes (Phase II, roadmap to 1,000) */
+#define SKYNET_MAX_PAYLOAD 400       /* Max payload size (bytes) */
+#define SKYNET_TIME_SLOT_US 1000     /* TDMA slot duration (1 ms, 1,000 slots/s) */
+#define SKYNET_NPG_MAX 200           /* Highest NPG ID */
+#define SKYNET_MAX_HOPS 3            /* Max hop count for OLSR mesh */
+#define SKYNET_FREQ_MIN_MHZ 400      /* UHF minimum frequency (MHz) */
+#define SKYNET_FREQ_MAX_MHZ 470      /* UHF maximum frequency (MHz) */
+#define SKYNET_HOPS_PER_SEC 100      /* FHSS hops per second */
+#define SKYNET_QOS_CHAT 0            /* QoS for chat (CSMA) */
+#define SKYNET_QOS_PLI 1             /* QoS for PLI (TDMA) */
+#define SKYNET_QOS_VOICE 2           /* QoS for voice (reserved) */
+#define SKYNET_QOS_C2 3              /* QoS for C2 (TDMA) */
+
+/* Network Participation Groups (NPGs) */
+#define SKYNET_NPG_CONTROL 1         /* Control: slot requests, key exchange */
+#define SKYNET_NPG_PLI 6             /* PLI: position, velocity, status */
+#define SKYNET_NPG_SURVEILLANCE 7    /* Surveillance: sensor data */
+#define SKYNET_NPG_CHAT 29           /* TacChat: group chat */
+#define SKYNET_NPG_C2 100            /* C2: waypoints, formations */
+#define SKYNET_NPG_ALERTS 101        /* Alerts: failures, self-healing */
+#define SKYNET_NPG_LOGISTICS 102     /* Logistics: supply chain */
+#define SKYNET_NPG_COORD 103         /* Inter-agent coordination */
+
+/* Message Types */
+typedef enum {
+    SKYNET_MSG_PUBLIC = 0,       /* Group chat (TacChat) */
+    SKYNET_MSG_CHAT,             /* Private chat (TacChat) */
+    SKYNET_MSG_ACK,              /* Acknowledgment */
+    SKYNET_MSG_KEY_EXCHANGE,     /* ECDH key exchange */
+    SKYNET_MSG_SLOT_REQUEST,     /* TDMA slot request */
+    SKYNET_MSG_WAYPOINT,         /* C2 waypoint command */
+    SKYNET_MSG_STATUS,           /* PLI or surveillance data */
+    SKYNET_MSG_FORMATION         /* C2 formation command */
+} MessageType;
+
+/* Node Roles */
+typedef enum {
+    NODE_ROLE_INFANTRY = 0,         /* Infantry node (TacChat) */
+    NODE_ROLE_DRONE,                /* Drone (Swarm C2) */
+    NODE_ROLE_RELAY,                /* Drone acting as relay */
+    NODE_ROLE_CONTROLLER,           /* Swarm controller */
+    NODE_ROLE_AIRCRAFT,             /* Aircraft */
+    NODE_ROLE_WARSHIP,              /* Warship */
+    NODE_ROLE_PLATFORM,             /* Platform (e.g., static sensor) */
+    NODE_ROLE_TRAIN,                /* Train */
+    NODE_ROLE_WHEELS                /* Vehicle with wheels */
+} NodeRole;
 
 // SkyNetMessage structure (from project scope)
 typedef struct {
@@ -53,19 +102,6 @@ typedef struct {
     uint8_t hmac[32];     // HMAC-SHA256
     uint32_t crc;         // CRC-32
 } SkyNetMessage;
-
-// Node roles (adapted from JURole)
-typedef enum {
-    NODE_ROLE_INFANTRY = 0, // Infantry node (TacChat)
-    NODE_ROLE_DRONE,        // Drone (Swarm C2)
-    NODE_ROLE_RELAY,        // Drone acting as relay
-    NODE_ROLE_CONTROLLER    // Swarm controller
-    NODE_ROLE_AIRCRAFT,     // Aircraft
-    NODE_ROLE_WARSHIP,      // Warship
-    NODE_ROLE_PLATFORM,     // Platform
-    NODE_ROLE_TRAIN,        // Train
-    NODE_ROLE_WHEELS,       // Vehicle with Wheels
-} NodeRole;
 
 // Node state
 typedef struct {
@@ -576,7 +612,7 @@ int main() {
         exit(1);
     }
     printf("SkyNet server bound to %s:%d\n", inet_ntoa(state.server_addr.sin_addr), ntohs(state.server_addr.sin_port));
-    uint8_t npgs[] = {1, 2, 3}; // NPGs for swarm control, chat, PLI
+    uint8_t npgs[] = {1, 6, 7, 29, 100, 101, 102, 103};
     struct ip_mreq mreq;
     for (size_t i = 0; i < sizeof(npgs) / sizeof(npgs[0]); i++) {
         char mcast_ip[16];
