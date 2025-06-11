@@ -3,115 +3,215 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 #include <time.h>
+#include "j-msg.h"
 
 #define PORT 8080
+#define MAX_JUS 32
 #define MAX_BUFFER 1024
-#define SLOT_DURATION_MS 100 // Scaled for simplicity (real Link 16: 7.8125 ms)
-#define SLOTS_PER_CYCLE 10 // Simplified (real Link 16: 128 slots/second)
-#define MAX_CLIENTS 10
+#define JU_ADDRESS_BASE 00001
+#define TIME_SLOT_INTERVAL_MS 7.8125
+#define FRAME_DURATION_MS (TADIL_J_FRAME_SLOTS * TIME_SLOT_INTERVAL_MS)
 
-// Mock J-series message (e.g., J0.0 for PPLI)
+/* JU State */
 typedef struct {
-    char type[10]; // e.g., "J0.0"
-    char source_id[20]; // e.g., "F16_001"
-    double lat, lon; // Mock position data
-} Message;
+    int sock_fd;                /* Client socket */
+    uint32_t ju_address;        /* JU address */
+    JURole role;                /* JU role */
+    uint8_t subscribed_npgs[32]; /* Subscribed NPGs */
+    uint32_t time_slots[16];    /* Assigned time slots */
+    uint32_t slot_count;        /* Number of assigned slots */
+} JUState;
 
-// Client info
+/* Server State */
 typedef struct {
-    struct sockaddr_in addr;
-    int slot; // Assigned time slot (0 to SLOTS_PER_CYCLE-1)
-} Client;
+    JUState jus[MAX_JUS];       /* Connected JUs */
+    uint32_t ju_count;          /* Number of JUs */
+    uint32_t current_slot;      /* Current time slot */
+    int ntr_assigned;           /* NTR assigned flag */
+} ServerState;
 
-Client clients[MAX_CLIENTS];
-int client_count = 0;
+/* Initialize server state */
+void server_init(ServerState *state) {
+    memset(state, 0, sizeof(ServerState));
+    state->current_slot = 0;
+    state->ntr_assigned = 0;
+}
 
-// Broadcast message to all clients
-void broadcast(int sock, char *buffer, int len) {
-    for (int i = 0; i < client_count; i++) {
-        sendto(sock, buffer, len, 0, (struct sockaddr *)&clients[i].addr, sizeof(clients[i].addr));
+/* Add JU to server */
+int add_ju(ServerState *state, int sock_fd) {
+    if (state->ju_count >= MAX_JUS) return -1;
+    JUState *ju = &state->jus[state->ju_count];
+    ju->sock_fd = sock_fd;
+    ju->ju_address = JU_ADDRESS_BASE + state->ju_count;
+    ju->role = JU_ROLE_NON_C2;
+    ju->slot_count = 1;
+    ju->time_slots[0] = state->ju_count * 100; /* Simple slot assignment */
+    state->ju_count++;
+    return 0;
+}
+
+/* Subscribe JU to NPG */
+void subscribe_npg(JUState *ju, uint8_t npg) {
+    for (int i = 0; i < 32; i++) {
+        if (ju->subscribed_npgs[i] == 0 || ju->subscribed_npgs[i] == npg) {
+            ju->subscribed_npgs[i] = npg;
+            break;
+        }
+    }
+}
+
+/* Broadcast message to subscribed JUs */
+void broadcast_message(ServerState *state, const JMessage *msg) {
+    uint8_t buffer[MAX_BUFFER];
+    int len = jmessage_serialize(msg, buffer, MAX_BUFFER);
+    if (len < 0) return;
+
+    for (uint32_t i = 0; i < state->ju_count; i++) {
+        JUState *ju = &state->jus[i];
+        for (int j = 0; j < 32 && ju->subscribed_npgs[j]; j++) {
+            if (ju->subscribed_npgs[j] == msg->npg && ju->sock_fd > 0) {
+                send(ju->sock_fd, buffer, len, 0);
+            }
+        }
+    }
+}
+
+/* Process control message */
+void process_control(ServerState *state, JUState *ju, JMessage *msg) {
+    if (msg->type == J_MSG_INITIAL_ENTRY) {
+        /* Assign role and NPGs */
+        subscribe_npg(ju, 1); /* Initial entry */
+        subscribe_npg(ju, 7); /* Surveillance */
+        if (!state->ntr_assigned) {
+            ju->role = JU_ROLE_NTR;
+            state->ntr_assigned = 1;
+            subscribe_npg(ju, 4); /* Network management */
+        }
+        printf("JU %05o joined, role: %d\n", ju->ju_address, ju->role);
+    } else if (msg->type == J_MSG_NETWORK_MANAGEMENT && ju->role == JU_ROLE_NTR) {
+        /* Handle time sync or slot reassignment */
+        printf("Network management from NTR %05o\n", ju->ju_address);
+    }
+}
+
+/* Process client message */
+void handle_message(ServerState *state, JUState *ju, JMessage *msg) {
+    if (msg->time_slot != state->current_slot) return; /* TDMA check */
+
+    switch (msg->type) {
+        case J_MSG_INITIAL_ENTRY:
+        case J_MSG_NETWORK_MANAGEMENT:
+            process_control(state, ju, msg);
+            break;
+        case J_MSG_PPLI_C2:
+        case J_MSG_PPLI_NON_C2:
+        case J_MSG_SURVEILLANCE:
+        case J_MSG_AIR_CONTROL:
+        case J_MSG_WEAPONS_COORD:
+        case J_MSG_FIGHTER_TO_FIGHTER:
+        case J_MSG_ENGAGEMENT_COORD:
+        case J_MSG_FREE_TEXT:
+            broadcast_message(state, msg);
+            jmessage_print(msg);
+            break;
+        default:
+            printf("Unsupported message type: %d\n", msg->type);
     }
 }
 
 int main() {
-    int sock;
-    struct sockaddr_in server_addr, client_addr;
-    socklen_t addr_len = sizeof(client_addr);
-    char buffer[MAX_BUFFER];
-    struct timespec slot_time = {0, SLOT_DURATION_MS * 1000000}; // 100 ms
-    // For real 7.8125 ms slots: {0, 7812500}
+    ServerState state;
+    server_init(&state);
 
-    // Create UDP socket
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0) {
+    int server_sock, client_sock;
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t client_len = sizeof(client_addr);
+    fd_set read_fds;
+    int max_fd;
+
+    /* Create socket */
+    server_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_sock == -1) {
         perror("Socket creation failed");
         exit(1);
     }
 
-    // Configure server address
+    /* Configure server address */
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(PORT);
 
-    // Bind socket
-    if (bind(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    /* Bind socket */
+    if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("Bind failed");
         exit(1);
     }
-    printf("Link 16 simulation server (MIDS-LVT-like) running on port %d...\n", PORT);
 
-    // Main loop: Simulate TDMA slots
-    int slot = 0;
+    /* Listen for connections */
+    if (listen(server_sock, 5) < 0) {
+        perror("Listen failed");
+        exit(1);
+    }
+    printf("Link 16 server listening on port %d...\n", PORT);
+
+    /* Simulate TDMA */
+    struct timespec slot_time = {0, (long)(TIME_SLOT_INTERVAL_MS * 1000000)};
     while (1) {
-        printf("Slot %d\n", slot);
-
-        // Receive messages in current slot (non-blocking)
-        fd_set read_fds;
         FD_ZERO(&read_fds);
-        FD_SET(sock, &read_fds);
-        struct timeval timeout = {0, 100000}; // 100 us timeout
-        if (select(sock + 1, &read_fds, NULL, NULL, &timeout) > 0) {
-            int len = recvfrom(sock, buffer, MAX_BUFFER - 1, 0, (struct sockaddr *)&client_addr, &addr_len);
-            if (len > 0) {
-                buffer[len] = '\0';
+        FD_SET(server_sock, &read_fds);
+        max_fd = server_sock;
 
-                // Register new client
-                int client_exists = 0;
-                for (int i = 0; i < client_count; i++) {
-                    if (clients[i].addr.sin_addr.s_addr == client_addr.sin_addr.s_addr &&
-                        clients[i].addr.sin_port == client_addr.sin_port) {
-                        client_exists = 1;
-                        break;
-                    }
-                }
-                if (!client_exists && client_count < MAX_CLIENTS) {
-                    clients[client_count].addr = client_addr;
-                    clients[client_count].slot = client_count % SLOTS_PER_CYCLE;
-                    client_count++;
-                    printf("New client (%s:%d) assigned slot %d\n",
-                           inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port),
-                           clients[client_count - 1].slot);
-                }
+        for (uint32_t i = 0; i < state.ju_count; i++) {
+            if (state.jus[i].sock_fd > 0) {
+                FD_SET(state.jus[i].sock_fd, &read_fds);
+                if (state.jus[i].sock_fd > max_fd) max_fd = state.jus[i].sock_fd;
+            }
+        }
 
-                // Process message (e.g., "J0.0 F16_001 40.0 -75.0")
-                Message msg;
-                if (sscanf(buffer, "%s %s %lf %lf", msg.type, msg.source_id, &msg.lat, &msg.lon) == 4) {
-                    printf("Received in slot %d: %s from %s (lat: %.2f, lon: %.2f)\n",
-                           slot, msg.type, msg.source_id, msg.lat, msg.lon);
-                    // Broadcast to all clients in next slot
-                    broadcast(sock, buffer, len);
-                } else {
-                    printf("Invalid message format in slot %d\n", slot);
+        /* Wait for activity or slot interval */
+        struct timeval timeout = {0, (long)(TIME_SLOT_INTERVAL_MS * 1000)};
+        int activity = select(max_fd + 1, &read_fds, NULL, NULL, &timeout);
+
+        if (activity < 0) {
+            perror("Select failed");
+            continue;
+        }
+
+        /* New connection */
+        if (FD_ISSET(server_sock, &read_fds)) {
+            client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &client_len);
+            if (client_sock >= 0) {
+                if (add_ju(&state, client_sock) < 0) {
+                    close(client_sock);
                 }
             }
         }
 
-        // Move to next slot
-        slot = (slot + 1) % SLOTS_PER_CYCLE;
-        nanosleep(&slot_time, NULL); // Wait for slot duration
+        /* Handle client messages */
+        uint8_t buffer[MAX_BUFFER];
+        for (uint32_t i = 0; i < state.ju_count; i++) {
+            JUState *ju = &state.jus[i];
+            if (ju->sock_fd > 0 && FD_ISSET(ju->sock_fd, &read_fds)) {
+                int len = recv(ju->sock_fd, buffer, MAX_BUFFER, 0);
+                if (len <= 0) {
+                    close(ju->sock_fd);
+                    ju->sock_fd = 0;
+                    continue;
+                }
+                JMessage msg;
+                if (jmessage_deserialize(&msg, buffer, len) >= 0) {
+                    handle_message(&state, ju, &msg);
+                }
+            }
+        }
+
+        /* Advance time slot */
+        state.current_slot = (state.current_slot + 1) % TADIL_J_FRAME_SLOTS;
+        nanosleep(&slot_time, NULL);
     }
 
-    close(sock);
+    close(server_sock);
     return 0;
 }

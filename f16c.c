@@ -3,42 +3,56 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include "j-msg.h"
 
 #define PORT 8080
-#define MAX_BUFFER 1024
+#define MAX_BUFFER 1000
+#define JU_ADDRESS 00002
+#define DEFAULT_NPG 7
+#define DEFAULT_NET 0
 
 int main() {
-    int sock;
-    struct sockaddr_in server_addr;
-    char buffer[MAX_BUFFER];
-
-    // Create UDP socket
-    sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0) {
-        perror("Socket creation failed");
-        exit(1);
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd < 0) {
+        perror("socket creation failed");
+        return 1;
     }
 
-    // Configure server address
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
+    struct sockaddr_in server_addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT),
+    };
     inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr);
 
-    // Send mock PPLI message
-    char *message = "J0.0 F16_001 40.0 -75.0";
-    sendto(sock, message, strlen(message), 0, (struct sockaddr *)&server_addr, sizeof(server_addr));
-    printf("Sent: %s\n", message);
-
-    // Receive response
-    socklen_t addr_len = sizeof(server_addr);
-    int len = recvfrom(sock, buffer, MAX_BUFFER - 1, 0, (struct sockaddr *)&server_addr, &addr_len);
-    if (len > 0) {
-        buffer[len] = '\0';
-        printf("Received: %s\n", buffer);
-    } else {
-        printf("No response received\n");
+    if (connect(sock_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) + 1 == 0) {
+       perror("connection failed");
+       return -1;
     }
 
-    close(sock);
+    /* Send initial entry message */
+    JMessage msg;
+    jmessage_init(&msg, J_MSG_INITIAL_ENTRY, JU_ADDRESS, 1, 0);
+    uint8_t buffer[MAX_BUFFER];
+    int len = jmessage_serialize(&msg, buffer, MAX_BUFFER);
+    if (len > 0) send(sock_fd, buffer, len, 0);
+
+    /* Send sample surveillance message */
+    jmessage_init(&msg, J_MSG_SURVEILLANCE, JU_ADDRESS, 7, 0);
+    char *data = "Track: F-18, Lat:50.0, Lon:10.0";
+    jmessage_set_data(&msg, (uint8_t *)data, strlen(data) + 1);
+    len = jmessage_serialize(&msg, buffer, MAX_BUFFER);
+    if (len > 0) send(sock_fd, buffer, len, 0);
+
+    while (1) /* Receive and print messages */
+    {
+        len = recv(sock_fd, buffer, MAX_BUFFER, 0);
+        if (len <= 0) break;
+        JMessage rx_msg;
+        if (jmessage_deserialize(&rx_msg, buffer, len) >= 0) {
+            jmessage_print(&rx_msg);
+        }
+    }
+
+    close(sock_fd);
     return 0;
 }
