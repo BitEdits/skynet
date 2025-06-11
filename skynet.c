@@ -41,8 +41,8 @@
 #define SKYNET_MAX_NODES 100         /* Max nodes (Phase II, roadmap to 1,000) */
 #define SKYNET_MAX_PAYLOAD 400       /* Max payload size (bytes) */
 #define SKYNET_TIME_SLOT_US 1000     /* TDMA slot duration (1 ms, 1,000 slots/s) */
-#define SKYNET_NPG_MAX 200           /* Highest NPG ID */
-#define SKYNET_MAX_HOPS 3            /* Max hop count for OLSR mesh */
+#define SKYNET_NPG_MAX 255           /* Highest NPG ID */
+#define SKYNET_MAX_HOPS 5            /* Max hop count for OLSR mesh */
 #define SKYNET_FREQ_MIN_MHZ 400      /* UHF minimum frequency (MHz) */
 #define SKYNET_FREQ_MAX_MHZ 470      /* UHF maximum frequency (MHz) */
 #define SKYNET_HOPS_PER_SEC 100      /* FHSS hops per second */
@@ -60,6 +60,163 @@
 #define SKYNET_NPG_ALERTS 101        /* Alerts: failures, self-healing */
 #define SKYNET_NPG_LOGISTICS 102     /* Logistics: supply chain */
 #define SKYNET_NPG_COORD 103         /* Inter-agent coordination */
+
+typedef enum {
+
+    // Ground Vehicles (Army, Marine Corps):
+
+    // Armored Fighting Vehicles
+    VEHICLE_M1_ABRAMS = 0,           // M1A1/A2 Main Battle Tank
+    VEHICLE_M2_BRADLEY,              // M2/M3 Infantry/Cavalry Fighting Vehicle
+    VEHICLE_M1126_STRYKER,           // Stryker Infantry Carrier Vehicle
+    VEHICLE_M113_APC,                // M113 Armored Personnel Carrier
+    VEHICLE_AMPV,                    // Armored Multi-Purpose Vehicle
+    VEHICLE_M10_BOOKER,              // M10 Booker Mobile Protected Firepower
+    VEHICLE_TERREX_ICV,              // Terrex Infantry Carrier (testing)
+
+    // Reconnaissance and Light Vehicles
+    VEHICLE_HMMWV,                   // Humvee (M998, M1151, etc.)
+    VEHICLE_JLTV,                    // Joint Light Tactical Vehicle
+    VEHICLE_MRAP,                    // Mine-Resistant Ambush Protected (MaxxPro, Cougar)
+    VEHICLE_LAV_25,                  // Light Armored Vehicle (Marine Corps)
+    VEHICLE_ISV,                     // Infantry Squad Vehicle (GM Defense)
+
+    // Artillery and Support
+    VEHICLE_M109_PALADIN,            // M109A7 Self-Propelled Howitzer
+    VEHICLE_M142_HIMARS,             // High Mobility Artillery Rocket System
+    VEHICLE_M270_MLRS,               // Multiple Launch Rocket System
+    VEHICLE_M88_HERCULES,            // M88A2 Recovery Vehicle
+    VEHICLE_M9_ACE,                  // M9 Armored Combat Earthmover
+
+    // Logistics and Transport
+    VEHICLE_HEMTT,                   // Heavy Expanded Mobility Tactical Truck
+    VEHICLE_LMTV,                    // Light Medium Tactical Vehicle
+    VEHICLE_FMTV,                    // Family of Medium Tactical Vehicles
+    VEHICLE_M1070_HET,               // Heavy Equipment Transporter
+    VEHICLE_PLS,                     // Palletized Load System
+
+    // Unmanned Ground Vehicles
+    VEHICLE_RCV_L,                   // Robotic Combat Vehicle (Light)
+    VEHICLE_RCV_M,                   // Robotic Combat Vehicle (Medium)
+    VEHICLE_S_MMET,                  // Small Multipurpose Equipment Transport
+
+    // Air Vehicles (Army, Air Force, Navy, Marine Corps):
+
+    // Fixed-Wing Aircraft
+    VEHICLE_F_15_EAGLE,              // F-15C/D/E Strike Eagle
+    VEHICLE_F_16_FALCON,             // F-16C/D Fighting Falcon
+    VEHICLE_F_22_RAPTOR,             // F-22A Stealth Fighter
+    VEHICLE_F_35_LIGHTNING,          // F-35A/B/C Joint Strike Fighter
+    VEHICLE_A_10_THUNDERBOLT,        // A-10C Warthog
+    VEHICLE_B_1_LANCER,              // B-1B Supersonic Bomber
+    VEHICLE_B_2_SPIRIT,              // B-2A Stealth Bomber
+    VEHICLE_B_21_RAIDER,             // B-21 Raider (in development)
+    VEHICLE_C_130_HERCULES,          // C-130H/J Transport
+    VEHICLE_C_17_GLOBEMASTER,        // C-17A Transport
+    VEHICLE_C_5_GALAXY,              // C-5M Super Galaxy
+    VEHICLE_KC_135_STRATOTANKER,     // KC-135R/T Refueler
+    VEHICLE_KC_46_PEGASUS,           // KC-46A Refueler
+    VEHICLE_E_3_SENTRY,              // E-3G AWACS
+    VEHICLE_E_8_JSTARS,              // E-8C Joint STARS
+    VEHICLE_U_2_DRAGON_LADY,         // U-2S Reconnaissance
+    VEHICLE_P_8_POSEIDON,            // P-8A Maritime Patrol
+    VEHICLE_C_12_HURON,              // C-12J Utility
+    VEHICLE_C_40_CLIPPER,            // C-40A/B Transport
+
+    // Rotary-Wing Aircraft
+    VEHICLE_AH_64_APACHE,            // AH-64D/E Attack Helicopter
+    VEHICLE_UH_60_BLACK_HAWK,        // UH-60L/M Utility Helicopter
+    VEHICLE_CH_47_CHINOOK,           // CH-47F Heavy-Lift Helicopter
+    VEHICLE_AH_1Z_VIPER,             // Marine Corps Attack Helicopter
+    VEHICLE_UH_1Y_VENOM,             // Marine Corps Utility Helicopter
+    VEHICLE_CH_53K_KING_STALLION,    // Marine Corps Heavy-Lift Helicopter
+    VEHICLE_MH_60_SEAHAWK,           // Navy Multi-Mission Helicopter
+    VEHICLE_V_22_OSPREY,             // Tiltrotor Transport
+
+    // Unmanned Aerial Vehicles
+    VEHICLE_MQ_9_REAPER,             // MQ-9A Armed Drone
+    VEHICLE_RQ_4_GLOBAL_HAWK,        // RQ-4B High-Altitude UAV
+    VEHICLE_MQ_1C_GRAY_EAGLE,        // Army Reconnaissance UAV
+    VEHICLE_RQ_7_SHADOW,             // Army Tactical UAV
+    VEHICLE_RQ_11_RAVEN,             // Small Hand-Launched UAV
+    VEHICLE_CQ_10_SNOWGOOSE,         // Cargo UAV
+    VEHICLE_MQ_25_STINGRAY,          // Navy Carrier-Based Refueling UAV
+    VEHICLE_X_47B,                   // Experimental Stealth UAV
+
+    // Air Defense and Support
+    VEHICLE_PATRIOT_PAC_3,           // Patriot Missile System (mobile launcher)
+    VEHICLE_THAAD,                   // Terminal High Altitude Area Defense
+    VEHICLE_AVENGER,                 // AN/TWQ-1 Air Defense System
+
+    // Sea Vehicles (Navy, Marine Corps, Coast Guard):
+
+    // Aircraft Carriers
+    VEHICLE_CVN_NIMITZ,              // Nimitz-class Nuclear Carrier
+    VEHICLE_CVN_FORD,                // Gerald R. Ford-class Nuclear Carrier
+
+    // Surface Combatants
+    VEHICLE_DDG_ARLEIGH_BURKE,       // Arleigh Burke-class Destroyer
+    VEHICLE_CG_TICONDEROGA,          // Ticonderoga-class Cruiser
+    VEHICLE_FFG_CONSTELLATION,       // Constellation-class Frigate
+    VEHICLE_LCS_FREEDOM,             // Freedom-class Littoral Combat Ship
+    VEHICLE_LCS_INDEPENDENCE,        // Independence-class Littoral Combat Ship
+
+    // Amphibious Ships
+    VEHICLE_LHA_AMERICA,             // America-class Amphibious Assault Ship
+    VEHICLE_LHD_WASP,                // Wasp-class Amphibious Assault Ship
+    VEHICLE_LPD_SAN_ANTONIO,         // San Antonio-class Amphibious Transport Dock
+    VEHICLE_LSD_HARPER_FERRY,        // Harpers Ferry-class Dock Landing Ship
+
+    // Submarines
+    VEHICLE_SSN_VIRGINIA,            // Virginia-class Attack Submarine
+    VEHICLE_SSN_LOS_ANGELES,         // Los Angeles-class Attack Submarine
+    VEHICLE_SSBN_OHIO,               // Ohio-class Ballistic Missile Submarine
+    VEHICLE_SSGN_OHIO,               // Ohio-class Guided Missile Submarine
+
+    // Support and Logistics Ships
+    VEHICLE_T_AKE_LEWIS_CLARK,       // Lewis and Clark-class Dry Cargo Ship
+    VEHICLE_T_AO_JOHN_LEWIS,         // John Lewis-class Fleet Replenishment Oiler
+    VEHICLE_T_ATF_POWHATAN,          // Powhatan-class Fleet Ocean Tug
+    VEHICLE_T_AH_MERCY,              // Mercy-class Hospital Ship
+
+    // Coast Guard Cutters
+    VEHICLE_WMSL_LEGEND,             // Legend-class National Security Cutter
+    VEHICLE_WPC_SENTINEL,            // Sentinel-class Fast Response Cutter
+    VEHICLE_WMEC_BEAR,               // Bear-class Medium Endurance Cutter
+    VEHICLE_WPB_ISLAND,              // Island-class Patrol Boat
+
+    // Unmanned Surface/Subsurface Vehicles
+    VEHICLE_ORCA_XLUUV,              // Orca Extra Large Unmanned Undersea Vehicle
+    VEHICLE_MUSV,                    // Medium Unmanned Surface Vehicle
+    VEHICLE_LUSV,                    // Large Unmanned Surface Vehicle
+
+    // Landing Craft
+    VEHICLE_LCAC,                    // Landing Craft Air Cushion
+    VEHICLE_LCU_1700,                // Landing Craft Utility
+    VEHICLE_SSC_SHIP_TO_SHORE,       // Ship-to-Shore Connector
+
+    // Space Vehicles (Space Force, Air Force):
+
+    // Satellites
+    VEHICLE_GPS_III,                 // GPS III Navigation Satellite
+    VEHICLE_AEHF,                    // Advanced Extremely High Frequency Satellite
+    VEHICLE_SBIRS,                   // Space-Based Infrared System Satellite
+    VEHICLE_WGS,                     // Wideband Global SATCOM Satellite
+
+    // Spacecraft
+    VEHICLE_X_37B,                   // Boeing X-37B Orbital Test Vehicle
+    VEHICLE_CST_100_STARLINER,       // Crew/Cargo Spacecraft (used by USAF)
+
+    // Launch Vehicles
+    VEHICLE_FALCON_9,                // SpaceX Falcon 9 (DoD launches)
+    VEHICLE_FALCON_HEAVY,            // SpaceX Falcon Heavy
+    VEHICLE_ATLAS_V,                 // ULA Atlas V
+    VEHICLE_DELTA_IV,                // ULA Delta IV Heavy
+    VEHICLE_VULCAN_CENTAUR,          // ULA Vulcan Centaur (emerging)
+
+    // End of Enum
+    VEHICLE_COUNT                    // Total number of vehicle types
+} USMilitaryVehicleType;
 
 /* Message Types */
 typedef enum {
@@ -79,11 +236,10 @@ typedef enum {
     NODE_ROLE_DRONE,                /* Drone (Swarm C2) */
     NODE_ROLE_RELAY,                /* Drone acting as relay */
     NODE_ROLE_CONTROLLER,           /* Swarm controller */
-    NODE_ROLE_AIRCRAFT,             /* Aircraft */
-    NODE_ROLE_WARSHIP,              /* Warship */
-    NODE_ROLE_PLATFORM,             /* Platform (e.g., static sensor) */
-    NODE_ROLE_TRAIN,                /* Train */
-    NODE_ROLE_WHEELS                /* Vehicle with wheels */
+    NODE_ROLE_GROUND_VEHICLE,       /* Armored Fighting, Reconnaissance and Light, Artillery and Support, Logistics and Transport, Unmanned Ground Vehicles */
+    NODE_ROLE_AIR_VEHICLE,          /* Fixed-Wing Aircraft, Rotary-Wing Aircraft, Unmanned Aerial Vehicles, Air Defense and Support */
+    NODE_ROLE_SEA_VEHICLE,          /* Aircraft Carriers, Surface Combatants, Amphibious Ships, Submarines,  Support and Logistics Ships, Coast Guard Cutters, Unmanned Surface/Subsurface Vehicles, Landing Crafts, */
+    NODE_ROLE_SPACE_VEHICLE,        /* Satellites, Spacecraft, Launch Vehicles  */
 } NodeRole;
 
 // SkyNetMessage structure (from project scope)
