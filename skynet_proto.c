@@ -6,9 +6,16 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
+#include <openssl/err.h>
 #include "skynet.h"
 
-/* Initialize a SkyNet message */
+static void print_openssl_error(void) {
+    unsigned long err = ERR_get_error();
+    char err_str[256];
+    ERR_error_string_n(err, err_str, sizeof(err_str));
+    fprintf(stderr, "OpenSSL error: %s\n", err_str);
+}
+
 void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, uint32_t npg_id, uint8_t qos) {
     memset(msg, 0, sizeof(SkyNetMessage));
     msg->version = SKYNET_VERSION;
@@ -21,40 +28,66 @@ void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, u
     RAND_bytes(msg->iv, 16); /* Random IV for AES-GCM */
 }
 
-/* Set encrypted payload data */
-void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length) {
+void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key, const uint8_t *hmac_key) {
     if (data_length > SKYNET_MAX_PAYLOAD) {
-        fprintf(stderr, "Payload too large: %u > %u\n", data_length, SKYNET_MAX_PAYLOAD);
+        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_length, SKYNET_MAX_PAYLOAD);
         return;
     }
+
+    /* Encrypt payload */
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) return;
-    uint8_t aes_key[32]; /* Placeholder; replace with ECDH-derived key */
-    RAND_bytes(aes_key, 32);
+    if (!ctx) {
+        print_openssl_error();
+        return;
+    }
     if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, aes_key, msg->iv) != 1) {
+        print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return;
     }
     int outlen, finallen;
     uint8_t outbuf[SKYNET_MAX_PAYLOAD];
     if (EVP_EncryptUpdate(ctx, outbuf, &outlen, data, data_length) != 1) {
+        print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return;
     }
     if (EVP_EncryptFinal_ex(ctx, outbuf + outlen, &finallen) != 1) {
+        print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return;
     }
     msg->payload_len = outlen + finallen;
     memcpy(msg->payload, outbuf, msg->payload_len);
     EVP_CIPHER_CTX_free(ctx);
+
+    /* Compute HMAC-SHA256 */
+    uint32_t data_len = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len;
+    uint8_t *hmac_data = malloc(data_len);
+    if (!hmac_data) {
+        fprintf(stderr, "Error: Memory allocation failed for HMAC\n");
+        return;
+    }
+    size_t offset = 0;
+    hmac_data[offset++] = msg->version;
+    hmac_data[offset++] = msg->type;
+    *(uint32_t *)(hmac_data + offset) = htonl(msg->npg_id); offset += 4;
+    *(uint32_t *)(hmac_data + offset) = htonl(msg->node_id); offset += 4;
+    *(uint32_t *)(hmac_data + offset) = htonl(msg->seq_no); offset += 4;
+    *(uint64_t *)(hmac_data + offset) = htobe64(msg->timestamp); offset += 8;
+    hmac_data[offset++] = msg->qos;
+    hmac_data[offset++] = msg->hop_count;
+    memcpy(hmac_data + offset, msg->iv, 16); offset += 16;
+    *(uint16_t *)(hmac_data + offset) = htons(msg->payload_len); offset += 2;
+    memcpy(hmac_data + offset, msg->payload, msg->payload_len);
+    HMAC(EVP_sha256(), hmac_key, 32, hmac_data, data_len, msg->hmac, NULL);
+    free(hmac_data);
 }
 
-/* Serialize a SkyNet message */
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size) {
     size_t required_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len + 32 + 4;
     if (buffer_size < required_size) {
-        fprintf(stderr, "Buffer too small: %zu < %zu\n", buffer_size, required_size);
+        fprintf(stderr, "Error: Buffer too small: %zu < %zu\n", buffer_size, required_size);
         return -1;
     }
     size_t offset = 0;
@@ -74,10 +107,11 @@ int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_si
     return offset;
 }
 
-/* Deserialize a SkyNet message */
 int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_size) {
-    size_t min_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2;
-    if (buffer_size < min_size) return -1;
+    size_t min_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + 32 + 4;
+    if (buffer_size < min_size) {
+        return -1;
+    }
     size_t offset = 0;
     msg->version = buffer[offset++];
     msg->type = buffer[offset++];
@@ -98,30 +132,20 @@ int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_
     return 0;
 }
 
-/* Print a SkyNet message */
 void skynet_print(const SkyNetMessage *msg) {
-    printf("SkyNetMessage: version=%u, type=%u, npg_id=%u, node_id=%u, seq_no=%u, "
-           "timestamp=%lu, qos=%u, hop_count=%u, payload_len=%u\n",
-           msg->version, msg->type, msg->npg_id, msg->node_id, msg->seq_no,
-           msg->timestamp, msg->qos, msg->hop_count, msg->payload_len);
-    if (msg->type == SKYNET_MSG_STATUS && msg->npg_id == SKYNET_NPG_PLI) {
-          float *pli = (float *)msg->payload;
-//        printf("PLI: pos=[%.1f, %.1f, %.1f], vel=[%.1f, %.1f, %.1f]\n",
-//               pli[0], pli[1], pli[2], pli[3], pli[4], pli[5]);
-          printf("PLI: pos=[%.1f, %.1f, %.1f], vel=[%.1f, %.1f, %.1f]\n",
-               pli[0], pli[1], pli[2], pli[3], pli[4], pli[5]);
-    } else if (msg->type == SKYNET_MSG_STATUS && msg->npg_id == SKYNET_NPG_SURVEILLANCE) {
-//        printf("Surveillance: %s\n", (char *)msg->payload);
-        printf("Surveillance\n");
-    }
+    printf("SkyNetMessage: version=%u, type=%u, npg_id=%u, node_id=%u, "
+           "seq_no=%u, timestamp=%lu, qos=%u, hop_count=%u, payload_len=%u\n",
+           msg->version, msg->type, msg->npg_id, msg->node_id,
+           msg->seq_no, msg->timestamp, msg->qos, msg->hop_count, msg->payload_len);
 }
 
-/* Verify HMAC-SHA256 */
 int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key) {
     unsigned char computed_hmac[32];
     uint32_t data_len = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len;
     uint8_t *data = malloc(data_len);
-    if (!data) return -1;
+    if (!data) {
+        return -1;
+    }
     size_t offset = 0;
     data[offset++] = msg->version;
     data[offset++] = msg->type;
@@ -139,21 +163,26 @@ int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key) {
     return memcmp(msg->hmac, computed_hmac, 32) == 0 ? 0 : -1;
 }
 
-/* Decrypt payload */
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) return -1;
+    if (!ctx) {
+        print_openssl_error();
+        return -1;
+    }
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, aes_key, msg->iv) != 1) {
+        print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
     int outlen, finallen;
     uint8_t outbuf[SKYNET_MAX_PAYLOAD];
     if (EVP_DecryptUpdate(ctx, outbuf, &outlen, msg->payload, msg->payload_len) != 1) {
+        print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
     if (EVP_DecryptFinal_ex(ctx, outbuf + outlen, &finallen) != 1) {
+        print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
@@ -162,3 +191,4 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     EVP_CIPHER_CTX_free(ctx);
     return 0;
 }
+
