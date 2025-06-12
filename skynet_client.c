@@ -19,7 +19,7 @@
 #include "skynet.h"
 
 #define PORT 6566
-#define MAX_BUFFER 1490
+#define MAX_BUFFER 1590
 #define VEHICLE_TYPE VEHICLE_F_16_FALCON
 #define NODE_ROLE NODE_ROLE_AIR_VEHICLE
 #define TIME_SLOT_INTERVAL_US 1000
@@ -48,11 +48,11 @@ static char *expand_home(const char *path) {
     return expanded;
 }
 
-static EVP_PKEY *load_ec_key(const char *name, int is_private) {
+static EVP_PKEY *load_ec_key(const char *hash_str, int is_private) {
     char *dir_path = expand_home(BASE_PATH);
     if (!dir_path) return NULL;
     char key_path[256];
-    snprintf(key_path, sizeof(key_path), "%s/%s.ec_%s", dir_path, name, is_private ? "priv" : "pub");
+    snprintf(key_path, sizeof(key_path), "%s/%s.ec_%s", dir_path, hash_str, is_private ? "priv" : "pub");
     FILE *key_file = fopen(key_path, "rb");
     free(dir_path);
     if (!key_file) {
@@ -66,13 +66,13 @@ static EVP_PKEY *load_ec_key(const char *name, int is_private) {
     return key;
 }
 
-static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key) {
+static int load_keys(const char *hash_str, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key) {
     char *dir_path = expand_home(BASE_PATH);
     if (!dir_path) return -1;
     char aes_path[256], hmac_path[256], id_path[256];
-    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, node_name);
-    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, node_name);
-    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, node_name);
+    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, hash_str);
+    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, hash_str);
+    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, hash_str);
     free(dir_path);
 
     FILE *file = fopen(aes_path, "rb");
@@ -90,7 +90,7 @@ static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key,
         return -1;
     }
     fclose(file);
-
+/*
     file = fopen(id_path, "rb");
     if (!file || fread(node_id, 1, sizeof(uint32_t), file) != sizeof(uint32_t)) {
         fprintf(stderr, "Failed to read node ID from %s: %s\n", id_path, strerror(errno));
@@ -98,8 +98,8 @@ static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key,
         return -1;
     }
     fclose(file);
-
-    *ec_key = load_ec_key(node_name, 1);
+*/
+    *ec_key = load_ec_key(hash_str, 1);
     if (!*ec_key) return -1;
     return 0;
 }
@@ -107,8 +107,11 @@ static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key,
 static int save_public_key(const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
     char *dir_path = expand_home(BASE_PATH);
     if (!dir_path) return -1;
+    uint32_t hash = fnv1a_32(node_name, strlen(node_name));
+    char hash_str[16];
+    snprintf(hash_str, sizeof(hash_str), "%08x", hash);
     char pub_path[256];
-    snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, node_name);
+    snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, hash_str);
     FILE *pub_file = fopen(pub_path, "wb");
     free(dir_path);
     if (!pub_file || fwrite(pub_key_data, 1, pub_key_len, pub_file) != pub_key_len) {
@@ -195,25 +198,37 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s <nodeName>\n", argv[0]);
         return 1;
     }
-    const char *node_name = argv[1];
-    if (strlen(node_name) > MAX_NODE_NAME) {
+    const char *argname = argv[1];
+    if (strlen(argname) > MAX_NODE_NAME) {
         fprintf(stderr, "Node name too long (max %d characters)\n", MAX_NODE_NAME);
         return 1;
     }
 
     uint8_t aes_key[32], hmac_key[32];
-    uint32_t node_id;
+    uint32_t node_id = fnv1a_32(argname, strlen(argname));
+    char node_name[16];
+    snprintf(node_name, sizeof(node_name), "%08x", node_id);
+
+    printf("Node name: %s\n", node_name);
+
     EVP_PKEY *ec_key = NULL;
     if (load_keys(node_name, aes_key, hmac_key, &node_id, &ec_key) < 0) {
         return 1;
     }
+
+    printf("Node id: %x\n", node_id);
 
     // Load topic public keys
     const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
     EVP_PKEY *topic_pub_keys[8] = {0};
     for (int i = 0; i < 8; i++) {
-        topic_pub_keys[i] = load_ec_key(topics[i], 0);
+
+        uint32_t topic_hash = fnv1a_32(topics[i], strlen(topics[i]));
+        char node_name[16];
+        snprintf(node_name, sizeof(node_name), "%08x", topic_hash);
+
+        topic_pub_keys[i] = load_ec_key(node_name, 0);
         if (!topic_pub_keys[i]) {
             fprintf(stderr, "Failed to load topic public key %s\n", topics[i]);
             EVP_PKEY_free(ec_key);
@@ -277,7 +292,7 @@ int main(int argc, char *argv[]) {
     uint32_t current_slot = 0;
     uint32_t seq_no = 0;
 
-    // Send initial key exchange with node name
+    // Send initial key exchange with public key only
     SkyNetMessage msg;
     skynet_init(&msg, SKYNET_MSG_KEY_EXCHANGE, node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
     msg.seq_no = seq_no++;
@@ -291,7 +306,6 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
-    char key_exchange_data[256 + MAX_NODE_NAME];
     char pub_key_data[512];
     long pub_key_len = BIO_read(bio, pub_key_data, sizeof(pub_key_data));
     BIO_free(bio);
@@ -303,11 +317,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     printf("Node name: %s\n", node_name);
-    memcpy(key_exchange_data, node_name, strlen(node_name) + 1);
-    memcpy(key_exchange_data + strlen(node_name) + 1, pub_key_data, pub_key_len);
-    skynet_set_data(&msg, (uint8_t *)key_exchange_data, strlen(node_name) + 1 + pub_key_len, aes_key, hmac_key);
+    skynet_set_data(&msg, (uint8_t *)pub_key_data, pub_key_len, aes_key, hmac_key);
+    skynet_print(&msg);
     int len = skynet_serialize(&msg, buffer, MAX_BUFFER);
-//    skynet_print((SkyNetMessage *)buffer);
     if (len > 0) {
         if (sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&npg_addrs[0], sizeof(npg_addrs[0])) < 0) {
             perror("Send key exchange failed");
@@ -403,7 +415,11 @@ int main(int argc, char *argv[]) {
                 EVP_PKEY *dec_key = NULL;
                 uint8_t dec_key_key[32], dec_hmac_key[32];
                 if (rx_msg.npg_id == SKYNET_NPG_CONTROL) {
-                    dec_key = load_ec_key(SERVER_NAME, 0);
+                    uint32_t hash = fnv1a_32(SERVER_NAME, strlen(SERVER_NAME));
+                    char hash_str[16];
+                    snprintf(hash_str, sizeof(hash_str), "%08x", hash);
+                    printf("Control: %s\n", hash_str);
+                    dec_key = load_ec_key(hash_str, 0);
                     if (!dec_key) continue;
                     if (derive_shared_key(ec_key, dec_key, dec_key_key, dec_hmac_key) < 0) {
                         EVP_PKEY_free(dec_key);
@@ -431,13 +447,9 @@ int main(int argc, char *argv[]) {
                     printf("Received on NPG %u, seq %u: ", rx_msg.npg_id, rx_msg.seq_no);
                     skynet_print(&rx_msg);
                     if (rx_msg.type == SKYNET_MSG_KEY_EXCHANGE && rx_msg.npg_id == SKYNET_NPG_CONTROL && !server_joined) {
-                        char *rx_node_name = (char *)rx_msg.payload;
-                        size_t name_len = strlen(rx_node_name) + 1;
-                        if (name_len < rx_msg.payload_len) {
-                            if (save_public_key(SERVER_NAME, rx_msg.payload + name_len, rx_msg.payload_len - name_len) == 0) {
-                                printf("Saved server public key for %s\n", SERVER_NAME);
-                                server_joined = 1;
-                            }
+                        if (save_public_key(SERVER_NAME, rx_msg.payload, rx_msg.payload_len) == 0) {
+                            printf("Saved server public key for %s\n", SERVER_NAME);
+                            server_joined = 1;
                         }
                     } else if (rx_msg.type == SKYNET_MSG_WAYPOINT && rx_msg.npg_id == SKYNET_NPG_C2) {
                         float *waypoint = (float *)rx_msg.payload;

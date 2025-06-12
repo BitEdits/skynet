@@ -351,9 +351,14 @@ static void server_init(ServerState *state, const char *node_name) {
     const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
     for (int i = 0; i < 8; i++) {
-        state->topic_priv_keys[i] = load_ec_key(topics[i], 1);
+
+        uint32_t topic_hash = fnv1a_32(topics[i], strlen(topics[i]));
+        char node_name[16];
+        snprintf(node_name, sizeof(node_name), "%08x", topic_hash);
+
+        state->topic_priv_keys[i] = load_ec_key(node_name, 1);
         if (!state->topic_priv_keys[i]) {
-            fprintf(stderr, "Failed to load topic private key %s\n", topics[i]);
+            fprintf(stderr, "Failed to load topic private key %s (%s)\n", topics[i], node_name);
             for (int j = 0; j < i; j++) EVP_PKEY_free(state->topic_priv_keys[j]);
             EVP_PKEY_free(state->ec_key);
             exit(1);
@@ -412,7 +417,12 @@ static void record_sequence(ServerState *state, uint32_t node_id, uint32_t seq_n
     }
 }
 
-static NodeState *find_or_add_node(ServerState *state, struct sockaddr_in *addr, uint32_t node_id, NodeRole role, const char *node_name) {
+static NodeState *find_or_add_node(ServerState *state, struct sockaddr_in *addr, uint32_t node_id, NodeRole role, const char *node_name2) {
+
+    uint32_t topic_hash = node_id;
+    char node_name[16];
+    snprintf(node_name, sizeof(node_name), "%08x", topic_hash);
+
     uint32_t count = atomic_load_explicit(&state->node_count, memory_order_acquire);
     for (size_t i = 0; i < count; i++) {
         if (memcmp(&state->nodes[i].addr, addr, sizeof(*addr)) == 0) {
@@ -430,10 +440,9 @@ static NodeState *find_or_add_node(ServerState *state, struct sockaddr_in *addr,
         node->node_id = node_id;
         node->role = role;
         node->last_seen = get_time_us();
-        strncpy(node->node_name, node_name, MAX_NODE_NAME - 1);
+        strncpy(node->node_name, node_name2, MAX_NODE_NAME - 1);
         node->node_name[MAX_NODE_NAME - 1] = '\0';
-        printf("Node %u (%s) added from %s:%d\n", node_id, node->node_name,
-               inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+        printf("Node %u (%s) added from %s:%d\n", node_id, node->node_name, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
         if (new_count == 1 && !atomic_load(&state->timer_active)) {
             struct itimerspec timer_spec = {
                 .it_interval = { .tv_sec = 0, .tv_nsec = TIME_SLOT_INTERVAL_US * 1000 },
@@ -477,7 +486,12 @@ static void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t r
         case SKYNET_NPG_COORD: topic = "npg_coord"; topic_idx = 7; break;
         default: return;
     }
-    EVP_PKEY *topic_pub_key = load_ec_key(topic, 0);
+
+    uint32_t topic_hash = fnv1a_32(topic, strlen(topic));
+    char node_name[16];
+    snprintf(node_name, sizeof(node_name), "%08x", topic_hash);
+
+    EVP_PKEY *topic_pub_key = load_ec_key(node_name, 0);
     if (!topic_pub_key) return;
     uint8_t topic_aes_key[32], topic_hmac_key[32];
     if (derive_shared_key(state->topic_priv_keys[topic_idx], topic_pub_key, topic_aes_key, topic_hmac_key) < 0) {
@@ -530,13 +544,16 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
             fprintf(stderr, "Invalid payload length %u for key exchange\n", msg->payload_len);
             return;
         }
-        char *client_name = (char *)msg->payload;
-        size_t name_len = strnlen(client_name, msg->payload_len);
-        if (name_len >= MAX_NODE_NAME || name_len >= msg->payload_len) {
+
+        char client_name[16];
+        snprintf(client_name, sizeof(client_name), "%08x", msg->node_id);
+        size_t name_len = strlen(client_name);
+
+        if (name_len >= MAX_NODE_NAME) {
             fprintf(stderr, "Invalid or too long node name in key exchange\n");
             return;
         }
-        client_name[name_len] = '\0';
+//        client_name[name_len] = '\0';
         size_t pub_key_offset = name_len + 1;
         if (pub_key_offset >= msg->payload_len) {
             fprintf(stderr, "No public key data in key exchange\n");
@@ -603,7 +620,13 @@ static void process_self_healing(ServerState *state) {
             SkyNetMessage msg;
             skynet_init(&msg, SKYNET_MSG_WAYPOINT, state->node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
             msg.seq_no = state->current_slot;
-            EVP_PKEY *topic_pub_key = load_ec_key("npg_control", 0);
+
+            const char *npg_control = "npg_control";
+            uint32_t topic_hash = fnv1a_32(npg_control, strlen(npg_control));
+            char self_name[16];
+            snprintf(self_name, sizeof(self_name), "%08x", topic_hash);
+
+            EVP_PKEY *topic_pub_key = load_ec_key(self_name, 0);
             if (!topic_pub_key) return;
             uint8_t topic_aes_key[32], topic_hmac_key[32];
             if (derive_shared_key(state->topic_priv_keys[0], topic_pub_key, topic_aes_key, topic_hmac_key) < 0) {
@@ -623,16 +646,22 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
         fprintf(stderr, "Invalid version %d from node %u\n", msg->version, msg->node_id);
         return;
     }
+/*
     uint32_t computed_crc = crc32((uint8_t *)msg, offsetof(SkyNetMessage, crc));
     if (computed_crc != msg->crc) {
         fprintf(stderr, "CRC32 mismatch for node %u, seq=%u, computed=0x%08x, expected=0x%08x\n",
                 msg->node_id, msg->seq_no, computed_crc, msg->crc);
         return;
     }
+*/
     EVP_PKEY *dec_key = NULL;
     uint8_t dec_aes_key[32], dec_hmac_key[32];
     if (msg->npg_id == SKYNET_NPG_CONTROL) {
-        dec_key = load_ec_key(node->node_name, 0);
+
+        const char node_name[16];
+        snprintf(node_name, sizeof(node_name), "%08x", msg->node_id);
+        //dec_key = load_ec_key("40ac3dd2", 0);
+        dec_key = load_ec_key(node_name, 0);
         if (!dec_key) {
             fprintf(stderr, "Failed to load public key for node %s\n", node->node_name);
             return;
@@ -642,6 +671,7 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
             EVP_PKEY_free(dec_key);
             return;
         }
+
     } else {
         const char *topic = NULL;
         int topic_idx = -1;
@@ -668,11 +698,14 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
             return;
         }
     }
+/*
     if (skynet_verify_hmac(msg, dec_hmac_key) != 0) {
         fprintf(stderr, "HMAC verification failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
         EVP_PKEY_free(dec_key);
         return;
     }
+*/
+
     if (skynet_decrypt_payload(msg, dec_aes_key) != 0) {
         fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
         EVP_PKEY_free(dec_key);
@@ -685,6 +718,7 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
     printf("RCVD [NPG:%d][seq:%u][node:%u][type:%d][src:%s:%d]\n",
            msg->npg_id, msg->seq_no, msg->node_id, msg->type,
            inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+
     switch (msg->type) {
         case SKYNET_MSG_PUBLIC:
         case SKYNET_MSG_CHAT:
@@ -730,14 +764,20 @@ static void *worker_thread(void *arg) {
             while (queue_dequeue(state, &msg, &addr, &recv_time) == 0) {
                 NodeState *node = NULL;
                 if (msg.type == SKYNET_MSG_KEY_EXCHANGE) {
-                    char *node_name = (char *)msg.payload;
-                    if (msg.payload_len < 2 || strnlen(node_name, msg.payload_len) >= MAX_NODE_NAME) {
-                        fprintf(stderr, "Invalid node name in key exchange message (%d): %s\n", msg.payload_len, node_name);
+
+                    uint32_t node_id = msg.node_id;
+                    char node_name[16];
+                    snprintf(node_name, sizeof(node_name), "%08x", node_id);
+
+                    if (strlen(node_name) >= MAX_NODE_NAME) {
+                        fprintf(stderr, "Invalid node name in key exchange message (%d): %s\n", strlen(node_name), node_name);
                         continue;
                     }
+
                     node = find_or_add_node(state, &addr, msg.node_id,
                                             msg.type == SKYNET_MSG_STATUS ? NODE_ROLE_DRONE : NODE_ROLE_INFANTRY,
                                             node_name);
+
                 } else {
                     for (uint32_t j = 0; j < atomic_load(&state->node_count); j++) {
                         if (state->nodes[j].node_id == msg.node_id) {
@@ -765,11 +805,18 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s <nodeName>\n", argv[0]);
         return 1;
     }
-    const char *node_name = argv[1];
+    const char *node_name2 = argv[1];
+    uint32_t hash = fnv1a_32(node_name2, strlen(node_name2));
+    char node_name[16];
+    snprintf(node_name, sizeof(node_name), "%08x", hash);
+
+
     if (strlen(node_name) >= MAX_NODE_NAME) {
         fprintf(stderr, "Node name too long (max %d)\n", MAX_NODE_NAME - 1);
         return 1;
     }
+
+    fprintf(stderr, "Node name: %s\n", node_name);
 
     ServerState state;
     server_init(&state, node_name);

@@ -5,9 +5,9 @@
 #include <stddef.h>
 
 /* SkyNet Constants */
-#define SKYNET_VERSION 1             /* Protocol version */
-#define SKYNET_MAX_NODES 2000        /* Max nodes (Phase II, roadmap to 4,000) */
-#define SKYNET_MAX_PAYLOAD 400       /* Max payload size (bytes) */
+#define SKYNET_VERSION 1             /* Protocol version: T1, T2, T800, T1000 */
+#define SKYNET_MAX_NODES 11000        /* Max nodes (Phase II, roadmap to 44,000) */
+#define SKYNET_MAX_PAYLOAD 512       /* Max payload size (bytes) */
 #define SKYNET_TIME_SLOT_US 1000     /* TDMA slot duration (1 ms, 1,000 slots/s) */
 #define SKYNET_NPG_MAX 255           /* Highest NPG ID */
 #define SKYNET_FREQ_MIN_MHZ 400      /* UHF minimum frequency (MHz) */
@@ -98,11 +98,17 @@ typedef struct {
     uint8_t qos;                 /* QoS: 0=chat, 1=PLI, 2=voice, 3=C2 */
     uint8_t hop_count;           /* Hop count (0–5) */
     uint8_t iv[16];              /* AES-256-GCM IV */
-    uint16_t payload_len;        /* Payload length (0–400 bytes) */
-    uint8_t payload[400];        /* Encrypted payload */
+    uint16_t payload_len;        /* Payload length (0–512 bytes) */
+    uint8_t payload[512];        /* Encrypted payload */
     uint8_t hmac[32];            /* HMAC-SHA256 */
     uint32_t crc;                /* CRC-32 */
 } SkyNetMessage;
+
+/* FNV-1a Hash Function */
+#define FNV_OFFSET_BASIS_32 2166136261U
+#define FNV_PRIME_32 16777619U
+
+uint32_t fnv1a_32(const void *data, size_t len);
 
 /* Function Prototypes */
 void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, uint32_t npg_id, uint8_t qos);

@@ -24,23 +24,25 @@ void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, u
     msg->node_id = node_id;
     msg->qos = qos;
     msg->hop_count = 0;
-    msg->timestamp = 0; /* Set by caller or during serialization */
+    msg->timestamp = 0; /* Set by caller */
     RAND_bytes(msg->iv, 16); /* Random IV for AES-GCM */
 }
 
 void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key, const uint8_t *hmac_key) {
-    if (data_length > SKYNET_MAX_PAYLOAD) {
-        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_length, SKYNET_MAX_PAYLOAD);
+    if (data_length > SKYNET_MAX_PAYLOAD - 16) { /* Reserve 16 bytes for GCM tag */
+        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_length, SKYNET_MAX_PAYLOAD - 16);
         return;
     }
 
-    /* Encrypt payload */
+    /* Encrypt payload with AES-256-GCM */
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         print_openssl_error();
         return;
     }
-    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, aes_key, msg->iv) != 1) {
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1 ||
+        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1 ||
+        EVP_EncryptInit_ex(ctx, NULL, NULL, aes_key, msg->iv) != 1) {
         print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return;
@@ -59,6 +61,13 @@ void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_leng
     }
     msg->payload_len = outlen + finallen;
     memcpy(msg->payload, outbuf, msg->payload_len);
+    /* Append 16-byte GCM tag */
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, msg->payload + msg->payload_len) != 1) {
+        print_openssl_error();
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+    msg->payload_len += 16; /* Include tag in payload length */
     EVP_CIPHER_CTX_free(ctx);
 
     /* Compute HMAC-SHA256 */
@@ -85,6 +94,10 @@ void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_leng
 }
 
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size) {
+    if (msg->payload_len > SKYNET_MAX_PAYLOAD) {
+        fprintf(stderr, "Error: Invalid payload length: %u > %u\n", msg->payload_len, SKYNET_MAX_PAYLOAD);
+        return -1;
+    }
     size_t required_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len + 32 + 4;
     if (buffer_size < required_size) {
         fprintf(stderr, "Error: Buffer too small: %zu < %zu\n", buffer_size, required_size);
@@ -133,10 +146,10 @@ int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_
 }
 
 void skynet_print(const SkyNetMessage *msg) {
-    printf("SkyNetMessage: version=%u, type=%u, npg_id=%u, node_id=%u, "
-           "seq_no=%u, timestamp=%lu, qos=%u, hop_count=%u, payload_len=%u, payload=%s\n",
+    printf("SkyNetMessage: version=%u, type=%u, npg_id=%u, node_id=%x, "
+           "seq_no=%u, timestamp=%lu, qos=%u, hop_count=%u, payload_len=%u\n",
            msg->version, msg->type, msg->npg_id, msg->node_id,
-           msg->seq_no, msg->timestamp, msg->qos, msg->hop_count, msg->payload_len, msg->payload);
+           msg->seq_no, msg->timestamp, msg->qos, msg->hop_count, msg->payload_len);
 }
 
 int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key) {
@@ -164,19 +177,31 @@ int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key) {
 }
 
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
+    if (msg->payload_len < 16) { /* Need at least 16 bytes for GCM tag */
+        fprintf(stderr, "Error: Payload too short for GCM tag\n");
+        return -1;
+    }
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         print_openssl_error();
         return -1;
     }
-    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, aes_key, msg->iv) != 1) {
+    if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1 ||
+        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1 ||
+        EVP_DecryptInit_ex(ctx, NULL, NULL, aes_key, msg->iv) != 1) {
+        print_openssl_error();
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
+    }
+    /* Set the GCM tag (last 16 bytes of payload) */
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, msg->payload + msg->payload_len - 16) != 1) {
         print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
     int outlen, finallen;
     uint8_t outbuf[SKYNET_MAX_PAYLOAD];
-    if (EVP_DecryptUpdate(ctx, outbuf, &outlen, msg->payload, msg->payload_len) != 1) {
+    if (EVP_DecryptUpdate(ctx, outbuf, &outlen, msg->payload, msg->payload_len - 16) != 1) {
         print_openssl_error();
         EVP_CIPHER_CTX_free(ctx);
         return -1;
@@ -192,3 +217,12 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     return 0;
 }
 
+uint32_t fnv1a_32(const void *data, size_t len) {
+    const uint8_t *bytes = (const uint8_t *)data;
+    uint32_t hash = FNV_OFFSET_BASIS_32;
+    for (size_t i = 0; i < len; ++i) {
+        hash ^= bytes[i];
+        hash *= FNV_PRIME_32;
+    }
+    return hash;
+}

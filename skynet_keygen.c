@@ -11,6 +11,7 @@
 #include <openssl/ec.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include "skynet.h"
 
 #define AES_KEY_LEN 32
 #define HMAC_KEY_LEN 32
@@ -70,12 +71,16 @@ static int generate_keys(const char *node_name, int is_client) {
         return -1;
     }
 
+    uint32_t hash = fnv1a_32(node_name, strlen(node_name));
+    char hash_str[16];
+    snprintf(hash_str, sizeof(hash_str), "%08x", hash);
+
     char aes_path[256], hmac_path[256], id_path[256], priv_path[256], pub_path[256];
-    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, node_name);
-    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, node_name);
-    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, node_name);
-    snprintf(priv_path, sizeof(priv_path), "%s/%s.ec_priv", dir_path, node_name);
-    snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, node_name);
+    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, hash_str);
+    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, hash_str);
+    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, hash_str);
+    snprintf(priv_path, sizeof(priv_path), "%s/%s.ec_priv", dir_path, hash_str);
+    snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, hash_str);
 
     // Generate AES key
     uint8_t aes_key[AES_KEY_LEN];
@@ -157,7 +162,7 @@ static int generate_keys(const char *node_name, int is_client) {
     fclose(pub_file);
 
     EC_KEY_free(ec_key);
-    printf("Generated keys for node %s in %s (ID: %u)\n", node_name, dir_path, node_id);
+    printf("Generated keys for node %s (hash: %s) in %s (ID: %u)\n", node_name, hash_str, dir_path, node_id);
     free(dir_path);
     return 0;
 }
