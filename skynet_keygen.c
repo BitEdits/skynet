@@ -59,7 +59,6 @@ static int generate_keys(const char *node_name, int is_client) {
     snprintf(priv_path, sizeof(priv_path), "%s/%s.ec_priv", dir_path, hash_str);
     snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, hash_str);
 
-
     // Generate secp384r1 key pair
     EC_KEY *ec_key = EC_KEY_new_by_curve_name(NID_secp384r1);
     if (!ec_key || !EC_KEY_generate_key(ec_key)) {

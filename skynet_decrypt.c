@@ -91,12 +91,6 @@ int main(int argc, char *argv[]) {
     uint32_t from_node_hash = fnv1a_32(argv[1], strlen(argv[1]));
     uint32_t to_node_hash = fnv1a_32(argv[2], strlen(argv[2]));
 
-    char from_node_name[16];
-    char to_node_name[16];
-
-    snprintf(from_node_name, sizeof(from_node_name), "%08x", from_node_hash);
-    snprintf(to_node_name, sizeof(to_node_name), "%08x", to_node_hash);
-
     const char *encrypted_file_name = argv[3];
     size_t file_len;
     uint8_t *encrypted_data = read_encrypted_file(encrypted_file_name, &file_len);
@@ -104,31 +98,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    fprintf(stderr, "Debug: Starting decryption: to=%s, from=%s, file=%s\n",  to_node_name, from_node_name, encrypted_file_name);
+    fprintf(stderr, "Debug: Starting decryption: to=%x, from=%x, file=%s\n",  to_node_hash, from_node_hash, encrypted_file_name);
 
     SkyNetMessage msg;
-/*
-    EVP_PKEY *priv_key = load_ec_key(1, to_node_name, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(0, from_node_name, 0);
 
-    if (!priv_key || !peer_pub_key) {
-        EVP_PKEY_free(priv_key);
-        EVP_PKEY_free(peer_pub_key);
-        return 1;
-    }
-
-    uint8_t aes_key[32], hmac_key[32];
-    if (derive_shared_key(priv_key, peer_pub_key, aes_key, hmac_key) < 0) {
-        EVP_PKEY_free(priv_key);
-        EVP_PKEY_free(peer_pub_key);
-        return 1;
-    }
-
-    EVP_PKEY_free(priv_key);
-    EVP_PKEY_free(peer_pub_key);
-*/
-
-    fprintf(stderr, "Debug: Deserializing message with size %d\n", file_len);
+    fprintf(stderr, "Debug: Deserializing message with size %ld\n", file_len);
     if (skynet_deserialize(&msg, encrypted_data, file_len) < 0) {
         fprintf(stderr, "Failed to deserialize message\n");
         free(encrypted_data);
@@ -136,22 +110,9 @@ int main(int argc, char *argv[]) {
     }
     free(encrypted_data);
 
-    skynet_decrypt(1, &msg, to_node_name, from_node_name);
+    skynet_decrypt(1, &msg, to_node_hash, from_node_hash);
 
-/*
-    fprintf(stderr, "Debug: Verifying HMAC\n");
-    if (skynet_verify_hmac(&msg, hmac_key) < 0) {
-        fprintf(stderr, "HMAC verification failed\n");
-        return 1;
-    }
-
-    fprintf(stderr, "Debug: Decrypting payload\n");
-    if (skynet_decrypt_payload(&msg, aes_key) < 0) {
-        fprintf(stderr, "Failed to decrypt payload\n");
-        return 1;
-    }
-*/
-    hex_dump("decrypt", &msg, 200);
+    hex_dump("decrypt", (char *)&msg, 200);
 
     char out_path[256];
     snprintf(out_path, sizeof(out_path), "%s.dec", encrypted_file_name);

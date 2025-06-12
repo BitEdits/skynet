@@ -55,7 +55,6 @@ char *build_key_path(int srv, const char *node_name, const char *suffix) {
 
     const char *base_path = get_base_path(srv, node_name);
 
-   fprintf(stderr, "Build key path: %s/%s \n", base_path, node_name);
 
     if (!base_path) {
         fprintf(stderr, "Invalid node name: %s (must be 'server' or 'client')\n", node_name);
@@ -72,7 +71,7 @@ char *build_key_path(int srv, const char *node_name, const char *suffix) {
         return NULL;
     }
 
-    snprintf(path, path_len, "%s/%s%s", dir_path, node_name, suffix);
+    snprintf(path, path_len, "%s%s%s", dir_path, node_name, suffix);
     free(dir_path);
     return path;
 }
@@ -80,6 +79,8 @@ char *build_key_path(int srv, const char *node_name, const char *suffix) {
 EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private) {
     char *key_path = build_key_path(srv, node_name, is_private ? ".ec_priv" : ".ec_pub");
     if (!key_path) return NULL;
+
+    fprintf(stderr, "Debug: Accessing keystore: %s\n", key_path);
 
     FILE *key_file = fopen(key_path, "rb");
     if (!key_file) {
@@ -214,19 +215,19 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
     return 0;
 }
 
-int skynet_decrypt(int srv, SkyNetMessage *msg, const char *to_node, const char *from_node) {
+int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_node) {
     if (!msg || !to_node || !from_node) {
         fprintf(stderr, "Error: Null pointer in skynet_decrypt\n");
         return -1;
     }
-    if (strlen(to_node) >= MAX_NODE_NAME || strlen(from_node) >= MAX_NODE_NAME) {
-        fprintf(stderr, "Node name too long (max %d characters)\n", MAX_NODE_NAME - 1);
-        return -1;
-    }
 
+    char to_name[16];
+    char from_name[16];
+    snprintf(to_name, sizeof(to_name), "%08x", to_node);
+    snprintf(from_name, sizeof(from_name), "%08x", from_node);
 
-    EVP_PKEY *priv_key = load_ec_key(1, to_node, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(0, from_node, 0);
+    EVP_PKEY *priv_key = load_ec_key(srv, to_name, 1);
+    EVP_PKEY *peer_pub_key = load_ec_key(srv ^ 1, from_name, 0);
 
     if (!priv_key || !peer_pub_key) {
         EVP_PKEY_free(priv_key);

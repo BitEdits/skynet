@@ -106,7 +106,7 @@ void skynet_print(const SkyNetMessage *msg);
 int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key);
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key);
 int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len);
-int skynet_decrypt(int srv, SkyNetMessage *msg, const char *to_node, const char *from_node);
+int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_node);
 int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key);
 EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private);
 int load_keys(int srv, const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key);

@@ -111,58 +111,9 @@ int main(int argc, char *argv[]) {
 
     SkyNetMessage msg;
 
-    skynet_encrypt(1, &msg, from_node_hash, to_node_hash, payload, payload_len);
+    skynet_encrypt(0, &msg, from_node_hash, to_node_hash, payload, payload_len);
 
-/*
-    EVP_PKEY *priv_key = load_ec_key(0, from_node_name, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(1, to_node_name, 0);
-    if (!priv_key || !peer_pub_key) {
-        EVP_PKEY_free(priv_key);
-        EVP_PKEY_free(peer_pub_key);
-        return 1;
-    }
-
-    uint8_t aes_key[32], hmac_key[32];
-    if (derive_shared_key(priv_key, peer_pub_key, aes_key, hmac_key) < 0) {
-        EVP_PKEY_free(priv_key);
-        EVP_PKEY_free(peer_pub_key);
-        return 1;
-    }
-
-    EVP_PKEY_free(priv_key);
-    EVP_PKEY_free(peer_pub_key);
-
-
-    SkyNetMessage msg;
-    uint32_t node_id = fnv1a_32(from_node_name, strlen(from_node_name));
-    uint32_t npg_id = SKYNET_NPG_CHAT; // Use chat NPG for private messages
-    skynet_init(&msg, SKYNET_MSG_CHAT, node_id, npg_id, SKYNET_QOS_CHAT);
-    fprintf(stderr, "Debug: Initialized SkyNetMessage, node_id=%u, npg_id=%u\n", node_id, npg_id);
-
-    uint8_t seq_no[4];
-    if (RAND_bytes(seq_no, sizeof(seq_no)) != 1) {
-        fprintf(stderr, "Failed to generate seq_no\n");
-        print_openssl_error();
-        free(payload);
-        return 1;
-    }
-
-    memcpy(&msg.seq_no, seq_no, sizeof(uint32_t));
-    msg.timestamp = get_time_us();
-    fprintf(stderr, "Debug: Set seq_no=%u, timestamp=%lu\n", msg.seq_no, msg.timestamp);
-
-    fprintf(stderr, "Debug: Setting message data\n");
-    skynet_set_data(&msg, payload, payload_len, aes_key, hmac_key);
-    free(payload);
-
-    if (msg.payload_len == 0) {
-        fprintf(stderr, "Failed to set message data\n");
-        return 1;
-    }
-    fprintf(stderr, "Debug: Message data set, payload_len=%u\n", msg.payload_len);
-*/
-
-    hex_dump("encrypt", &msg, 200);
+    hex_dump("encrypt", (char *)&msg, 200);
 
     uint8_t buffer[MAX_BUFFER];
     fprintf(stderr, "Debug: Serializing message\n");
