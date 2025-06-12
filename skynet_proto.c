@@ -134,9 +134,9 @@ int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_
 
 void skynet_print(const SkyNetMessage *msg) {
     printf("SkyNetMessage: version=%u, type=%u, npg_id=%u, node_id=%u, "
-           "seq_no=%u, timestamp=%lu, qos=%u, hop_count=%u, payload_len=%u\n",
+           "seq_no=%u, timestamp=%lu, qos=%u, hop_count=%u, payload_len=%u, payload=%s\n",
            msg->version, msg->type, msg->npg_id, msg->node_id,
-           msg->seq_no, msg->timestamp, msg->qos, msg->hop_count, msg->payload_len);
+           msg->seq_no, msg->timestamp, msg->qos, msg->hop_count, msg->payload_len, msg->payload);
 }
 
 int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key) {

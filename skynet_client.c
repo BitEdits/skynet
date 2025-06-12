@@ -302,6 +302,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
+    printf("Node name: %s\n", node_name);
     memcpy(key_exchange_data, node_name, strlen(node_name) + 1);
     memcpy(key_exchange_data + strlen(node_name) + 1, pub_key_data, pub_key_len);
     skynet_set_data(&msg, (uint8_t *)key_exchange_data, strlen(node_name) + 1 + pub_key_len, aes_key, hmac_key);
