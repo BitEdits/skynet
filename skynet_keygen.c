@@ -1,4 +1,4 @@
-// gcc -o skynet_keygen skynet_keygen.c -lcrypto
+// gcc -o skynet_keygen skynet_keygen.c skynet_proto.c -lcrypto
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,44 +56,9 @@ static int generate_keys(const char *node_name, int is_client) {
     snprintf(hash_str, sizeof(hash_str), "%08x", hash);
 
     char aes_path[256], hmac_path[256], id_path[256], priv_path[256], pub_path[256];
-    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, hash_str);
-    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, hash_str);
     snprintf(priv_path, sizeof(priv_path), "%s/%s.ec_priv", dir_path, hash_str);
     snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, hash_str);
 
-    // Generate AES key
-    uint8_t aes_key[AES_KEY_LEN];
-    if (RAND_bytes(aes_key, AES_KEY_LEN) != 1) {
-        fprintf(stderr, "Failed to generate AES key\n");
-        print_openssl_error();
-        free(dir_path);
-        return -1;
-    }
-    FILE *aes_file = fopen(aes_path, "wb");
-    if (!aes_file || fwrite(aes_key, 1, AES_KEY_LEN, aes_file) != AES_KEY_LEN) {
-        fprintf(stderr, "Failed to write AES key to %s: %s\n", aes_path, strerror(errno));
-        if (aes_file) fclose(aes_file);
-        free(dir_path);
-        return -1;
-    }
-    fclose(aes_file);
-
-    // Generate HMAC key
-    uint8_t hmac_key[HMAC_KEY_LEN];
-    if (RAND_bytes(hmac_key, HMAC_KEY_LEN) != 1) {
-        fprintf(stderr, "Failed to generate HMAC key\n");
-        print_openssl_error();
-        free(dir_path);
-        return -1;
-    }
-    FILE *hmac_file = fopen(hmac_path, "wb");
-    if (!hmac_file || fwrite(hmac_key, 1, HMAC_KEY_LEN, hmac_file) != HMAC_KEY_LEN) {
-        fprintf(stderr, "Failed to write HMAC key to %s: %s\n", hmac_path, strerror(errno));
-        if (hmac_file) fclose(hmac_file);
-        free(dir_path);
-        return -1;
-    }
-    fclose(hmac_file);
 
     // Generate secp384r1 key pair
     EC_KEY *ec_key = EC_KEY_new_by_curve_name(NID_secp384r1);
