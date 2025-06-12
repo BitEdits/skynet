@@ -48,11 +48,11 @@ static char *expand_home(const char *path) {
     return expanded;
 }
 
-static EVP_PKEY *load_ec_key(const char *node_name, int is_private) {
+static EVP_PKEY *load_ec_key(const char *name, int is_private) {
     char *dir_path = expand_home(BASE_PATH);
     if (!dir_path) return NULL;
     char key_path[256];
-    snprintf(key_path, sizeof(key_path), "%s/%s.ec_%s", dir_path, node_name, is_private ? "priv" : "pub");
+    snprintf(key_path, sizeof(key_path), "%s/%s.ec_%s", dir_path, name, is_private ? "priv" : "pub");
     FILE *key_file = fopen(key_path, "rb");
     free(dir_path);
     if (!key_file) {
@@ -75,29 +75,29 @@ static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key,
     snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, node_name);
     free(dir_path);
 
-    FILE *aes_file = fopen(aes_path, "rb");
-    if (!aes_file || fread(aes_key, 1, 32, aes_file) != 32) {
+    FILE *file = fopen(aes_path, "rb");
+    if (!file || fread(aes_key, 1, 32, file) != 32) {
         fprintf(stderr, "Failed to read AES key from %s: %s\n", aes_path, strerror(errno));
-        if (aes_file) fclose(aes_file);
+        if (file) fclose(file);
         return -1;
     }
-    fclose(aes_file);
+    fclose(file);
 
-    FILE *hmac_file = fopen(hmac_path, "rb");
-    if (!hmac_file || fread(hmac_key, 1, 32, hmac_file) != 32) {
+    file = fopen(hmac_path, "rb");
+    if (!file || fread(hmac_key, 1, 32, file) != 32) {
         fprintf(stderr, "Failed to read HMAC key from %s: %s\n", hmac_path, strerror(errno));
-        if (hmac_file) fclose(hmac_file);
+        if (file) fclose(file);
         return -1;
     }
-    fclose(hmac_file);
+    fclose(file);
 
-    FILE *id_file = fopen(id_path, "rb");
-    if (!id_file || fread(node_id, 1, sizeof(uint32_t), id_file) != sizeof(uint32_t)) {
+    file = fopen(id_path, "rb");
+    if (!file || fread(node_id, 1, sizeof(uint32_t), file) != sizeof(uint32_t)) {
         fprintf(stderr, "Failed to read node ID from %s: %s\n", id_path, strerror(errno));
-        if (id_file) fclose(id_file);
+        if (file) fclose(file);
         return -1;
     }
-    fclose(id_file);
+    fclose(file);
 
     *ec_key = load_ec_key(node_name, 1);
     if (!*ec_key) return -1;
@@ -208,16 +208,16 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Load topic keys
+    // Load topic public keys
     const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
-    EVP_PKEY *topic_priv_keys[8] = {0};
+    EVP_PKEY *topic_pub_keys[8] = {0};
     for (int i = 0; i < 8; i++) {
-        topic_priv_keys[i] = load_ec_key(topics[i], 1);
-        if (!topic_priv_keys[i]) {
-            fprintf(stderr, "Failed to load topic private key %s\n", topics[i]);
+        topic_pub_keys[i] = load_ec_key(topics[i], 0);
+        if (!topic_pub_keys[i]) {
+            fprintf(stderr, "Failed to load topic public key %s\n", topics[i]);
             EVP_PKEY_free(ec_key);
-            for (int j = 0; j < i; j++) EVP_PKEY_free(topic_priv_keys[j]);
+            for (int j = 0; j < i; j++) EVP_PKEY_free(topic_pub_keys[j]);
             return 1;
         }
     }
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
     if (sock_fd < 0) {
         perror("Socket creation failed");
         EVP_PKEY_free(ec_key);
-        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_priv_keys[i]);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
 
@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
         perror("Set non-blocking failed");
         close(sock_fd);
         EVP_PKEY_free(ec_key);
-        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_priv_keys[i]);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
 
@@ -243,7 +243,7 @@ int main(int argc, char *argv[]) {
         perror("Set SO_REUSEADDR failed");
         close(sock_fd);
         EVP_PKEY_free(ec_key);
-        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_priv_keys[i]);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
 
@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
         BIO_free(bio);
         close(sock_fd);
         EVP_PKEY_free(ec_key);
-        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_priv_keys[i]);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
     char key_exchange_data[256 + MAX_NODE_NAME];
@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to read public key data\n");
         close(sock_fd);
         EVP_PKEY_free(ec_key);
-        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_priv_keys[i]);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
     memcpy(key_exchange_data, node_name, strlen(node_name) + 1);
@@ -335,15 +335,12 @@ int main(int argc, char *argv[]) {
                 msg.seq_no = seq_no++;
                 float pli_data[6] = { 50.0f + message_count * 0.1f, 10.0f + message_count * 0.1f, 10000.0f,
                                       0.0f, 0.0f, 0.0f };
-                EVP_PKEY *topic_pub_key = load_ec_key("npg_pli", 0);
-                if (!topic_pub_key) continue;
                 uint8_t topic_key[32], topic_hmac_key[32];
-                if (derive_shared_key(topic_priv_keys[1], topic_pub_key, topic_key, topic_hmac_key) < 0) {
-                    EVP_PKEY_free(topic_pub_key);
+                if (derive_shared_key(ec_key, topic_pub_keys[1], topic_key, topic_hmac_key) < 0) {
+                    fprintf(stderr, "Failed to derive shared key for npg_pli\n");
                     continue;
                 }
                 skynet_set_data(&msg, (uint8_t *)pli_data, sizeof(pli_data), topic_key, topic_hmac_key);
-                EVP_PKEY_free(topic_pub_key);
                 len = skynet_serialize(&msg, buffer, MAX_BUFFER);
                 if (len > 0) {
                     if (sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&npg_addrs[1], sizeof(npg_addrs[1])) < 0) {
@@ -361,15 +358,12 @@ int main(int argc, char *argv[]) {
                 msg.seq_no = seq_no++;
                 char data[64];
                 snprintf(data, sizeof(data), "Track: F-16, Lat:50.%d, Lon:10.%d, Alt:10000ft", message_count, message_count);
-                EVP_PKEY *topic_pub_key = load_ec_key("npg_surveillance", 0);
-                if (!topic_pub_key) continue;
                 uint8_t topic_key[32], topic_hmac_key[32];
-                if (derive_shared_key(topic_priv_keys[2], topic_pub_key, topic_key, topic_hmac_key) < 0) {
-                    EVP_PKEY_free(topic_pub_key);
+                if (derive_shared_key(ec_key, topic_pub_keys[2], topic_key, topic_hmac_key) < 0) {
+                    fprintf(stderr, "Failed to derive shared key for npg_surveillance\n");
                     continue;
                 }
                 skynet_set_data(&msg, (uint8_t *)data, strlen(data) + 1, topic_key, topic_hmac_key);
-                EVP_PKEY_free(topic_pub_key);
                 len = skynet_serialize(&msg, buffer, MAX_BUFFER);
                 if (len > 0) {
                     if (sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&npg_addrs[2], sizeof(npg_addrs[2])) < 0) {
@@ -398,7 +392,7 @@ int main(int argc, char *argv[]) {
             len = (int)recv(sock_fd, buffer, sizeof(buffer), 0);
             if (len < 0) {
                 if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                    perror("recvfrom");
+                    perror("recv");
                 }
                 continue;
             }
@@ -414,22 +408,20 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
                 } else {
-                    const char *topic_name = NULL;
                     int topic_idx = -1;
                     switch (rx_msg.npg_id) {
-                        case SKYNET_NPG_PLI: topic_name = "npg_pli"; topic_idx = 1; break;
-                        case SKYNET_NPG_SURVEILLANCE: topic_name = "npg_surveillance"; topic_idx = 2; break;
-                        case SKYNET_NPG_CHAT: topic_name = "npg_chat"; topic_idx = 3; break;
-                        case SKYNET_NPG_C2: topic_name = "npg_c2"; topic_idx = 4; break;
-                        case SKYNET_NPG_ALERTS: topic_name = "npg_alerts"; topic_idx = 5; break;
-                        case SKYNET_NPG_LOGISTICS: topic_name = "npg_logistics"; topic_idx = 6; break;
-                        case SKYNET_NPG_COORD: topic_name = "npg_coord"; topic_idx = 7; break;
+                        case SKYNET_NPG_PLI: topic_idx = 1; break;
+                        case SKYNET_NPG_SURVEILLANCE: topic_idx = 2; break;
+                        case SKYNET_NPG_CHAT: topic_idx = 3; break;
+                        case SKYNET_NPG_C2: topic_idx = 4; break;
+                        case SKYNET_NPG_ALERTS: topic_idx = 5; break;
+                        case SKYNET_NPG_LOGISTICS: topic_idx = 6; break;
+                        case SKYNET_NPG_COORD: topic_idx = 7; break;
                         default: continue;
                     }
-                    dec_key = load_ec_key(topic_name, 0);
+                    dec_key = topic_pub_keys[topic_idx];
                     if (!dec_key) continue;
-                    if (derive_shared_key(topic_priv_keys[topic_idx], dec_key, dec_key_key, dec_hmac_key) < 0) {
-                        EVP_PKEY_free(dec_key);
+                    if (derive_shared_key(ec_key, dec_key, dec_key_key, dec_hmac_key) < 0) {
                         continue;
                     }
                 }
@@ -450,13 +442,13 @@ int main(int argc, char *argv[]) {
                         printf("Received waypoint: [%.1f, %.1f, %.1f]\n", waypoint[0], waypoint[1], waypoint[2]);
                     }
                 }
-                EVP_PKEY_free(dec_key);
+                if (rx_msg.npg_id == SKYNET_NPG_CONTROL) EVP_PKEY_free(dec_key);
             }
         }
     }
 
     close(sock_fd);
     EVP_PKEY_free(ec_key);
-    for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_priv_keys[i]);
+    for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
     return 0;
 }

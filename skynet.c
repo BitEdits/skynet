@@ -21,10 +21,11 @@
 #include <stdatomic.h>
 #include <net/if.h>
 #include <openssl/rand.h>
-#include <openssl/ec.h>
-#include <openssl/pem.h>
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 #include <openssl/err.h>
+#include <openssl/kdf.h>
+#include <openssl/params.h>
 #include "skynet.h"
 
 #define PORT 6566
@@ -59,7 +60,7 @@ static char *expand_home(const char *path) {
     return expanded;
 }
 
-static EC_KEY *load_ec_key(const char *node_name, int is_private) {
+static EVP_PKEY *load_ec_key(const char *node_name, int is_private) {
     char *dir_path = expand_home(BASE_PATH);
     if (!dir_path) return NULL;
     char key_path[256];
@@ -70,36 +71,45 @@ static EC_KEY *load_ec_key(const char *node_name, int is_private) {
         fprintf(stderr, "Failed to open %s: %s\n", key_path, strerror(errno));
         return NULL;
     }
-    EC_KEY *key = is_private ? PEM_read_ECPrivateKey(key_file, NULL, NULL, NULL) :
-                               PEM_read_EC_PUBKEY(key_file, NULL, NULL, NULL);
+    EVP_PKEY *key = is_private ? PEM_read_PrivateKey(key_file, NULL, NULL, NULL) :
+                                 PEM_read_PUBKEY(key_file, NULL, NULL, NULL);
     fclose(key_file);
     if (!key) print_openssl_error();
     return key;
 }
 
-static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, EC_KEY **ec_key) {
+static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key) {
     char *dir_path = expand_home(BASE_PATH);
     if (!dir_path) return -1;
-    char aes_path[256], hmac_path[256];
+    char aes_path[256], hmac_path[256], id_path[256];
     snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, node_name);
     snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, node_name);
+    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, node_name);
     free(dir_path);
 
-    FILE *aes_file = fopen(aes_path, "rb");
-    if (!aes_file || fread(aes_key, 1, 32, aes_file) != 32) {
+    FILE *file = fopen(aes_path, "rb");
+    if (!file || fread(aes_key, 1, 32, file) != 32) {
         fprintf(stderr, "Failed to read AES key from %s: %s\n", aes_path, strerror(errno));
-        if (aes_file) fclose(aes_file);
+        if (file) fclose(file);
         return -1;
     }
-    fclose(aes_file);
+    fclose(file);
 
-    FILE *hmac_file = fopen(hmac_path, "rb");
-    if (!hmac_file || fread(hmac_key, 1, 32, hmac_file) != 32) {
+    file = fopen(hmac_path, "rb");
+    if (!file || fread(hmac_key, 1, 32, file) != 32) {
         fprintf(stderr, "Failed to read HMAC key from %s: %s\n", hmac_path, strerror(errno));
-        if (hmac_file) fclose(hmac_file);
+        if (file) fclose(file);
         return -1;
     }
-    fclose(hmac_file);
+    fclose(file);
+
+    file = fopen(id_path, "rb");
+    if (!file || fread(node_id, 1, sizeof(uint32_t), file) != sizeof(uint32_t)) {
+        fprintf(stderr, "Failed to read node ID from %s: %s\n", id_path, strerror(errno));
+        if (file) fclose(file);
+        return -1;
+    }
+    fclose(file);
 
     *ec_key = load_ec_key(node_name, 1);
     if (!*ec_key) return -1;
@@ -122,31 +132,67 @@ static int save_public_key(const char *node_name, const uint8_t *pub_key_data, s
     return 0;
 }
 
-static int derive_shared_key(EC_KEY *priv_key, EC_KEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key) {
-    uint8_t shared_secret[48];
-    int secret_len = ECDH_compute_key(shared_secret, sizeof(shared_secret), EC_KEY_get0_public_key(peer_pub_key), priv_key, NULL);
-    if (secret_len <= 0) {
+static int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key) {
+    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(priv_key, NULL);
+    if (!ctx || EVP_PKEY_derive_init(ctx) <= 0) {
         print_openssl_error();
+        EVP_PKEY_CTX_free(ctx);
         return -1;
     }
-    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-    if (!ctx || EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) != 1 ||
-        EVP_DigestUpdate(ctx, shared_secret, secret_len) != 1 ||
-        EVP_DigestFinal_ex(ctx, aes_key, NULL) != 1) {
-        EVP_MD_CTX_free(ctx);
+    if (EVP_PKEY_derive_set_peer(ctx, peer_pub_key) <= 0) {
         print_openssl_error();
+        EVP_PKEY_CTX_free(ctx);
         return -1;
     }
-    EVP_MD_CTX_reset(ctx);
-    if (EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) != 1 ||
-        EVP_DigestUpdate(ctx, shared_secret, secret_len) != 1 ||
-        EVP_DigestUpdate(ctx, "HMAC", 4) != 1 ||
-        EVP_DigestFinal_ex(ctx, hmac_key, NULL) != 1) {
-        EVP_MD_CTX_free(ctx);
+    size_t secret_len;
+    if (EVP_PKEY_derive(ctx, NULL, &secret_len) <= 0) {
         print_openssl_error();
+        EVP_PKEY_CTX_free(ctx);
         return -1;
     }
-    EVP_MD_CTX_free(ctx);
+    uint8_t *shared_secret = malloc(secret_len);
+    if (!shared_secret || EVP_PKEY_derive(ctx, shared_secret, &secret_len) <= 0) {
+        print_openssl_error();
+        free(shared_secret);
+        EVP_PKEY_CTX_free(ctx);
+        return -1;
+    }
+    EVP_PKEY_CTX_free(ctx);
+
+    EVP_KDF *kdf = EVP_KDF_fetch(NULL, "HKDF", NULL);
+    EVP_KDF_CTX *kdf_ctx = EVP_KDF_CTX_new(kdf);
+    if (!kdf_ctx) {
+        print_openssl_error();
+        free(shared_secret);
+        EVP_KDF_free(kdf);
+        return -1;
+    }
+    OSSL_PARAM params[] = {
+        OSSL_PARAM_construct_utf8_string("digest", "SHA256", 0),
+        OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len),
+        OSSL_PARAM_construct_end()
+    };
+    if (EVP_KDF_derive(kdf_ctx, aes_key, 32, params) <= 0) {
+        print_openssl_error();
+        EVP_KDF_CTX_free(kdf_ctx);
+        EVP_KDF_free(kdf);
+        free(shared_secret);
+        return -1;
+    }
+    params[0] = OSSL_PARAM_construct_utf8_string("digest", "SHA256", 0);
+    params[1] = OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len);
+    params[2] = OSSL_PARAM_construct_octet_string("info", (unsigned char *)"HMAC", 4);
+    params[3] = OSSL_PARAM_construct_end();
+    if (EVP_KDF_derive(kdf_ctx, hmac_key, 32, params) <= 0) {
+        print_openssl_error();
+        EVP_KDF_CTX_free(kdf_ctx);
+        EVP_KDF_free(kdf);
+        free(shared_secret);
+        return -1;
+    }
+    EVP_KDF_CTX_free(kdf_ctx);
+    EVP_KDF_free(kdf);
+    free(shared_secret);
     return 0;
 }
 
@@ -193,9 +239,10 @@ typedef struct {
     atomic_int timer_active;
     uint8_t aes_key[32];
     uint8_t hmac_key[32];
-    EC_KEY *ec_key;
+    EVP_PKEY *ec_key;
     char server_name[MAX_NODE_NAME];
-    EC_KEY *topic_priv_keys[8];
+    EVP_PKEY *topic_priv_keys[8];
+    uint32_t node_id;
 } ServerState;
 
 typedef struct {
@@ -293,7 +340,7 @@ static void pin_thread(int core_id) {
 static void server_init(ServerState *state, const char *node_name) {
     memset(state, 0, sizeof(ServerState));
     strncpy(state->server_name, node_name, MAX_NODE_NAME - 1);
-    if (load_keys(node_name, state->aes_key, state->hmac_key, &state->ec_key)) {
+    if (load_keys(node_name, state->aes_key, state->hmac_key, &state->node_id, &state->ec_key)) {
         fprintf(stderr, "Failed to load keys\n");
         exit(1);
     }
@@ -303,6 +350,8 @@ static void server_init(ServerState *state, const char *node_name) {
         state->topic_priv_keys[i] = load_ec_key(topics[i], 1);
         if (!state->topic_priv_keys[i]) {
             fprintf(stderr, "Failed to load topic private key %s\n", topics[i]);
+            for (int j = 0; j < i; j++) EVP_PKEY_free(state->topic_priv_keys[j]);
+            EVP_PKEY_free(state->ec_key);
             exit(1);
         }
     }
@@ -327,14 +376,13 @@ static int is_duplicate(ServerState *state, uint32_t node_id, uint32_t seq_no, u
     uint32_t hash = (node_id ^ seq_no) % MAX_SEQUENCES;
     for (int i = 0; i < MAX_SEQUENCES; i++) {
         uint32_t idx = (hash + i) % MAX_SEQUENCES;
-        if (atomic_load_explicit(&state->seqs[idx].claimed, memory_order_acquire) == 0) {
-            break;
-        }
-        if (state->seqs[idx].node_id == node_id && state->seqs[idx].seq_no == seq_no) {
-            if (current_time - state->seqs[idx].timestamp < 2) {
-                printf("[[%s]] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n",
-                       time_str, node_id, type, seq_no, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
-                return 1;
+        if (atomic_load_explicit(&state->seqs[idx].claimed, memory_order_acquire)) {
+            if (state->seqs[idx].node_id == node_id && state->seqs[idx].seq_no == seq_no) {
+                if (current_time - state->seqs[idx].timestamp < 2) {
+                    printf("[[%s]] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n",
+                           time_str, node_id, type, seq_no, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+                    return 1;
+                }
             }
         }
     }
@@ -424,17 +472,17 @@ static void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t r
         case SKYNET_NPG_COORD: topic = "npg_coord"; topic_idx = 7; break;
         default: return;
     }
-    EC_KEY *topic_pub_key = load_ec_key(topic, 0);
+    EVP_PKEY *topic_pub_key = load_ec_key(topic, 0);
     if (!topic_pub_key) return;
     uint8_t topic_aes_key[32], topic_hmac_key[32];
     if (derive_shared_key(state->topic_priv_keys[topic_idx], topic_pub_key, topic_aes_key, topic_hmac_key) < 0) {
-        EC_KEY_free(topic_pub_key);
+        EVP_PKEY_free(topic_pub_key);
         return;
     }
     SkyNetMessage enc_msg = *msg;
     skynet_set_data(&enc_msg, msg->payload, msg->payload_len, topic_aes_key, topic_hmac_key);
     int len = skynet_serialize(&enc_msg, buffer, MAX_BUFFER);
-    EC_KEY_free(topic_pub_key);
+    EVP_PKEY_free(topic_pub_key);
     if (len < 0) return;
 
     struct sockaddr_in mcast_addr = {
@@ -459,7 +507,7 @@ static void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t r
 static void process_control(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
     if (msg->type == SKYNET_MSG_SLOT_REQUEST) {
         subscribe_npg(node, msg->npg_id);
-        if (node->role == NODE_ROLE_DRONE && msg->npg_id == 1) {
+        if (node->role == NODE_ROLE_DRONE && msg->npg_id == SKYNET_NPG_CONTROL) {
             node->role = NODE_ROLE_CONTROLLER;
             printf("Node %u promoted to swarm controller\n", node->node_id);
         }
@@ -479,34 +527,33 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
             if (save_public_key(client_name, msg->payload + name_len, msg->payload_len - name_len) == 0) {
                 printf("Saved public key for client %s\n", client_name);
                 SkyNetMessage response;
-                skynet_init(&response, SKYNET_MSG_KEY_EXCHANGE, 0, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
+                skynet_init(&response, SKYNET_MSG_KEY_EXCHANGE, state->node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
                 response.seq_no = state->current_slot;
                 BIO *bio = BIO_new(BIO_s_mem());
-                if (!bio || !PEM_write_bio_EC_PUBKEY(bio, state->ec_key)) {
+                if (!bio || !PEM_write_bio_PUBKEY(bio, state->ec_key)) {
                     BIO_free(bio);
                     return;
                 }
                 char pub_key_data[512];
                 long pub_key_len = BIO_read(bio, pub_key_data, sizeof(pub_key_data));
                 BIO_free(bio);
-                if (pub_key_len > 0) {
-                    char response_data[256 + MAX_NODE_NAME];
-                    memcpy(response_data, state->server_name, strlen(state->server_name) + 1);
-                    memcpy(response_data + strlen(state->server_name) + 1, pub_key_data, pub_key_len);
-                    EC_KEY *client_pub_key = load_ec_key(client_name, 0);
-                    if (!client_pub_key) return;
-                    uint8_t aes_key[32], hmac_key[32];
-                    if (derive_shared_key(state->ec_key, client_pub_key, aes_key, hmac_key) < 0) {
-                        EC_KEY_free(client_pub_key);
-                        return;
-                    }
-                    EC_KEY_free(client_pub_key);
-                    skynet_set_data(&response, (uint8_t *)response_data, strlen(state->server_name) + 1 + pub_key_len, aes_key, hmac_key);
-                    uint8_t buffer[MAX_BUFFER];
-                    int len = skynet_serialize(&response, buffer, MAX_BUFFER);
-                    if (len > 0) {
-                        send_to_npg(state, &response, recv_time);
-                    }
+                if (pub_key_len <= 0) return;
+                char response_data[256 + MAX_NODE_NAME];
+                memcpy(response_data, state->server_name, strlen(state->server_name) + 1);
+                memcpy(response_data + strlen(state->server_name) + 1, pub_key_data, pub_key_len);
+                EVP_PKEY *client_pub_key = load_ec_key(client_name, 0);
+                if (!client_pub_key) return;
+                uint8_t aes_key[32], hmac_key[32];
+                if (derive_shared_key(state->ec_key, client_pub_key, aes_key, hmac_key) < 0) {
+                    EVP_PKEY_free(client_pub_key);
+                    return;
+                }
+                EVP_PKEY_free(client_pub_key);
+                skynet_set_data(&response, (uint8_t *)response_data, strlen(state->server_name) + 1 + pub_key_len, aes_key, hmac_key);
+                uint8_t buffer[MAX_BUFFER];
+                int len = skynet_serialize(&response, buffer, MAX_BUFFER);
+                if (len > 0) {
+                    send_to_npg(state, &response, recv_time);
                 }
             }
         }
@@ -523,17 +570,17 @@ static void process_self_healing(ServerState *state) {
             }
             atomic_fetch_sub(&state->node_count, 1);
             SkyNetMessage msg;
-            skynet_init(&msg, SKYNET_MSG_WAYPOINT, 0, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
+            skynet_init(&msg, SKYNET_MSG_WAYPOINT, state->node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
             msg.seq_no = state->current_slot;
-            EC_KEY *topic_pub_key = load_ec_key("npg_control", 0);
+            EVP_PKEY *topic_pub_key = load_ec_key("npg_control", 0);
             if (!topic_pub_key) return;
             uint8_t topic_aes_key[32], topic_hmac_key[32];
             if (derive_shared_key(state->topic_priv_keys[0], topic_pub_key, topic_aes_key, topic_hmac_key) < 0) {
-                EC_KEY_free(topic_pub_key);
+                EVP_PKEY_free(topic_pub_key);
                 return;
             }
             skynet_set_data(&msg, NULL, 0, topic_aes_key, topic_hmac_key);
-            EC_KEY_free(topic_pub_key);
+            EVP_PKEY_free(topic_pub_key);
             send_to_npg(state, &msg, now);
         }
     }
@@ -549,13 +596,13 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
         fprintf(stderr, "CRC32 mismatch for node %u, seq=%u\n", msg->node_id, msg->seq_no);
         return;
     }
-    EC_KEY *dec_key = NULL;
-    uint8_t dec_key[32], dec_hmac_key[32];
+    EVP_PKEY *dec_key = NULL;
+    uint8_t dec_aes_key[32], dec_hmac_key[32];
     if (msg->npg_id == SKYNET_NPG_CONTROL) {
         dec_key = load_ec_key(node->node_name, 0);
         if (!dec_key) return;
-        if (derive_shared_key(state->ec_key, dec_key, dec_key, dec_hmac_key) < 0) {
-            EC_KEY_free(dec_key);
+        if (derive_shared_key(state->ec_key, dec_key, dec_aes_key, dec_hmac_key) < 0) {
+            EVP_PKEY_free(dec_key);
             return;
         }
     } else {
@@ -573,22 +620,22 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
         }
         dec_key = load_ec_key(topic, 0);
         if (!dec_key) return;
-        if (derive_shared_key(state->topic_priv_keys[topic_idx], dec_key, dec_key, dec_hmac_key) < 0) {
-            EC_KEY_free(dec_key);
+        if (derive_shared_key(state->topic_priv_keys[topic_idx], dec_key, dec_aes_key, dec_hmac_key) < 0) {
+            EVP_PKEY_free(dec_key);
             return;
         }
     }
-    if (skynet_verify_hmac(&msg, dec_hmac_key) != 0) {
+    if (skynet_verify_hmac(msg, dec_hmac_key) != 0) {
         fprintf(stderr, "HMAC verification failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
-        EC_KEY_free(dec_key);
+        EVP_PKEY_free(dec_key);
         return;
     }
-    if (skynet_decrypt_payload(&msg, dec_key) != 0) {
+    if (skynet_decrypt_payload(msg, dec_aes_key) != 0) {
         fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
-        EC_KEY_free(dec_key);
+        EVP_PKEY_free(dec_key);
         return;
     }
-    EC_KEY_free(dec_key);
+    EVP_PKEY_free(dec_key);
     if (is_duplicate(state, msg->node_id, msg->seq_no, msg->type, addr)) {
         return;
     }
@@ -628,7 +675,12 @@ static void *worker_thread(void *arg) {
         }
         for (int i = 0; i < nfds; i++) {
             uint64_t count;
-            read(state->mq.event_fds[worker_id], &count, sizeof(count));
+            if (read(state->mq.event_fds[worker_id], &count, sizeof(count)) < 0) {
+                if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                    perror("Eventfd read failed");
+                }
+                continue;
+            }
             SkyNetMessage msg;
             struct sockaddr_in addr;
             uint64_t recv_time;
@@ -677,43 +729,44 @@ int main(int argc, char *argv[]) {
     state.socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (state.socket_fd == -1) {
         perror("Socket creation failed");
-        EC_KEY_free(state.ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state.topic_priv_keys[i]);
-        exit(1);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     if (set_non_blocking(state.socket_fd) < 0) {
         perror("Set non-blocking failed");
         close(state.socket_fd);
-        EC_KEY_free(state.ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     int opt = 1;
     if (setsockopt(state.socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         perror("Set SO_REUSEADDR failed");
         close(state.socket_fd);
-        EC_KEY_free(state.ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     int buf_size = 1 * 1024 * 1024;
     if (setsockopt(state.socket_fd, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size)) < 0 ||
         setsockopt(state.socket_fd, SOL_SOCKET, SO_SNDBUF, &buf_size, sizeof(buf_size)) < 0) {
         perror("Set buffer failed");
         close(state.socket_fd);
-        EC_KEY_free(state.ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     if (bind(state.socket_fd, (struct sockaddr *)&state.server_addr, sizeof(state.server_addr)) < 0) {
         perror("Bind failed");
         close(state.socket_fd);
-        EC_KEY_free(state.ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     printf("SkyNet server bound to %s:%d\n", inet_ntoa(state.server_addr.sin_addr), ntohs(state.server_addr.sin_port));
-    uint8_t npgs[] = {1, 6, 7, 29, 100, 101, 102, 103};
+    uint8_t npgs[] = { SKYNET_NPG_CONTROL, SKYNET_NPG_PLI, SKYNET_NPG_SURVEILLANCE, SKYNET_NPG_CHAT,
+                       SKYNET_NPG_C2, SKYNET_NPG_ALERTS, SKYNET_NPG_LOGISTICS, SKYNET_NPG_COORD };
     struct ip_mreq mreq;
     for (size_t i = 0; i < sizeof(npgs) / sizeof(npgs[0]); i++) {
         char mcast_ip[16];
@@ -729,73 +782,82 @@ int main(int argc, char *argv[]) {
     state.epoll_fd = epoll_create1(0);
     if (state.epoll_fd == -1) {
         perror("Epoll creation failed");
-        close(state->socket_fd);
-        EC_KEY_free(state.ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        close(state.socket_fd);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
-    struct epoll_event ev = { .events = EPOLLIN, .data = { .fd = state->socket_fd} };
-    if (epoll_ctl(state->epoll_fd, EPOLL_PID, state->socket_fd, &epoll_event) < 0) {
+    struct epoll_event ev = { .events = EPOLLIN, .data = { .fd = state.socket_fd } };
+    if (epoll_ctl(state.epoll_fd, EPOLL_CTL_ADD, state.socket_fd, &ev) < 0) {
         perror("Epoll add socket failed");
-        close(state->epoll_fd);
-        close(state->socket_fd);
-        EC_KEY_free(state->ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        close(state.epoll_fd);
+        close(state.socket_fd);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     state.timer_fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-    if (state->timer_fd == -1) {
+    if (state.timer_fd == -1) {
         perror("Timerfd creation failed");
-        close(state->epoll_fd);
-        close(state->socket_fd);
-        EC_KEY_free(state->ec_key);
-        for (int i = 0; i < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        close(state.epoll_fd);
+        close(state.socket_fd);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     ev.events = EPOLLIN;
-    ev.data.fd = state->timer_fd;
-    if (epoll_ctl(state->epoll_fd, EPOLL_PID, state->timer_fd, &epoll_event) < 0) {
+    ev.data.fd = state.timer_fd;
+    if (epoll_ctl(state.epoll_fd, EPOLL_CTL_ADD, state.timer_fd, &ev) < 0) {
         perror("Epoll add timer failed");
-        close(state->timerfd_fd);
-        close(state->epoll_fd);
-        close(state->socket_fd);
-        EC_KEY_free(state->ec_key);
-        for (int i = 0; i = < 8; i)++) EC_KEY_free(state->topic_priv_keys[i]);
-        exit(1);
+        close(state.timer_fd);
+        close(state.epoll_fd);
+        close(state.socket_fd);
+        EVP_PKEY_free(state.ec_key);
+        for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
+        return 1;
     }
     for (int i = 0; i < THREAD_COUNT; i++) {
         WorkerState *ws = malloc(sizeof(WorkerState));
+        if (!ws) {
+            perror("Worker state allocation failed");
+            return 1;
+        }
         ws->state = &state;
         ws->worker_id = i;
         ws->epoll_fd = epoll_create1(0);
-        if (ws->epoll_fd < 0)) {
+        if (ws->epoll_fd < 0) {
             perror("Worker epoll creation");
-            exit(1);
+            free(ws);
+            return 1;
         }
-        ev.events = epoll_fd;
-        ev.data.fd = state->mq.event_fds[i];
-        if (epoll_ctl(ws->epoll_fd, EPOLL_CTL_PID, state->mq.event_fds[i], &ev) < 0)) {
+        ev.events = EPOLLIN;
+        ev.data.fd = state.mq.event_fds[i];
+        if (epoll_ctl(ws->epoll_fd, EPOLL_CTL_ADD, state.mq.event_fds[i], &ev) < 0) {
             perror("Worker epoll add eventfd failed");
-            exit(1);
+            close(ws->epoll_fd);
+            free(ws);
+            return 1;
         }
-        if (pthread_create(&state->workers[i], NULL, worker_thread, ws)) {
+        if (pthread_create(&state.workers[i], NULL, worker_thread, ws)) {
             perror("Failed to create worker thread");
-            exit(1);
+            close(ws->epoll_fd);
+            free(ws);
+            return 1;
         }
         printf("Started worker thread %d\n", i);
     }
     printf("SkyNet server listening on port %d with %d worker threads\n", PORT, THREAD_COUNT);
     struct epoll_event events[MAX_EVENTS];
     uint8_t eventsbuffer[MAX_BUFFER];
-    struct epoll_iovec iov = { .iov_base = buffer, .iov_len = MAX_BUFFER };
+    struct iovec iov = { .iov_base = eventsbuffer, .iov_len = MAX_BUFFER };
     struct msghdr mhdr = {
         .msg_iov = &iov,
         .msg_iovlen = 1,
         .msg_control = NULL,
         .msg_controllen = 0
     };
-    while (atomic_load(&state->running)) {
-        int nfds = epoll_wait(state->epoll_fd, events, MAX_EVENTS, -1);
+    while (atomic_load(&state.running)) {
+        int nfds = epoll_wait(state.epoll_fd, events, MAX_EVENTS, -1);
         if (nfds < 0) {
             if (errno != EINTR) {
                 perror("Epoll wait failed");
@@ -803,12 +865,12 @@ int main(int argc, char *argv[]) {
             continue;
         }
         for (int i = 0; i < nfds; i++) {
-            if (events[i].data.fd == state->socket_fd) {
+            if (events[i].data.fd == state.socket_fd) {
                 uint64_t urecv_time = get_time_us();
                 struct sockaddr_in client_addr;
                 mhdr.msg_name = &client_addr;
                 mhdr.msg_namelen = sizeof(client_addr);
-                ssize_t len = recvmsg(state->socket_fd, &mhdr, 0);
+                ssize_t len = recvmsg(state.socket_fd, &mhdr, 0);
                 if (len < 0) {
                     if (errno != EAGAIN && errno != EWOULDBLOCK) {
                         perror("Recvmsg failed");
@@ -816,38 +878,45 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 SkyNetMessage msg;
-                if (skynet_deserialize(&msg, buffer, len) < 0) {
+                if (skynet_deserialize(&msg, eventsbuffer, len) < 0) {
                     continue;
                 }
-                if (queue_enqueue(&state, &msg, &client_addr, urecv_time) < time0) {
+                if (queue_enqueue(&state, &msg, &client_addr, urecv_time) < 0) {
                     fprintf(stderr, "Failed to enqueue message to queue\n");
                 }
-            } else if (events[i].data.fd == state->timer_fd) {
+            } else if (events[i].data.fd == state.timer_fd) {
                 uint64_t expirations;
-                read(state->timer_fd, &expirations, sizeof(uint64_t));
-                state->current_slot = (state->current_slot + 1) % t1000;
+                if (read(state.timer_fd, &expirations, sizeof(uint64_t)) < 0) {
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        perror("Timerfd read failed");
+                    }
+                    continue;
+                }
+                state.current_slot = (state.current_slot + 1) % 1000;
                 process_self_healing(&state);
-                if (atomic_load(&state->node_count) == 0 && atomic_load(&state->timer_active)) {
+                if (atomic_load(&state.node_count) == 0 && atomic_load(&state.timer_active)) {
                     struct itimerspec timer_spec = { .it_interval = {0}, .it_value = {0} };
-                    if (timerfd_settime(state->timer_fd, 0, &timer_spec, NULL) < 0)) {
+                    if (timerfd_settime(state.timer_fd, 0, &timer_spec, NULL) < 0) {
                         perror("Timerfd disable failed");
                     }
-                    atomic_store(&state->timer_active, 0);
+                    atomic_store(&state.timer_active, 0);
                 }
             }
         }
     }
-    atomic_store(&state->state.running, 0);
+    atomic_store(&state.running, 0);
     for (int i = 0; i < THREAD_COUNT; i++) {
-        pthread_join(state->state.workers[i], NULL);
+        pthread_join(state.workers[i], NULL);
     }
     for (int i = 0; i < THREAD_COUNT; i++) {
-        close(state->mq.event_fds[i]);
+        close(state.mq.event_fds[i]);
     }
-    close(state->timerfd_fd);
-    close(state->epoll_fd);
-    close(state->socket_fd);
-    EC_KEY_free(state->ec_key);
-    for (int i = 0; i = < 8; i++) EC_KEY_free(state->topic_priv_keys[i]);
+    close(state.timer_fd);
+    close(state.epoll_fd);
+    close(state.socket_fd);
+    EVP_PKEY_free(state.ec_key);
+    for (int i = 0; i < 8; i++) {
+        EVP_PKEY_free(state.topic_priv_keys[i]);
+    }
     return 0;
 }
