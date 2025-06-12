@@ -28,100 +28,6 @@
 #define BASE_PATH "~/.skynet_client/ecc/secp384r1/"
 #define SERVER_NAME "server"
 
-static void print_openssl_error(void) {
-    unsigned long err = ERR_get_error();
-    char err_str[256];
-    ERR_error_string_n(err, err_str, sizeof(err_str));
-    fprintf(stderr, "OpenSSL error: %s\n", err_str);
-}
-
-static char *expand_home(const char *path) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        fprintf(stderr, "HOME environment variable not set\n");
-        return NULL;
-    }
-    size_t len = strlen(home) + strlen(path) + 1;
-    char *expanded = malloc(len);
-    if (!expanded) return NULL;
-    snprintf(expanded, len, "%s%s", home, path + 1);
-    return expanded;
-}
-
-static EVP_PKEY *load_ec_key(const char *hash_str, int is_private) {
-    char *dir_path = expand_home(BASE_PATH);
-    if (!dir_path) return NULL;
-    char key_path[256];
-    snprintf(key_path, sizeof(key_path), "%s/%s.ec_%s", dir_path, hash_str, is_private ? "priv" : "pub");
-    FILE *key_file = fopen(key_path, "rb");
-    free(dir_path);
-    if (!key_file) {
-        fprintf(stderr, "Failed to open %s: %s\n", key_path, strerror(errno));
-        return NULL;
-    }
-    EVP_PKEY *key = is_private ? PEM_read_PrivateKey(key_file, NULL, NULL, NULL) :
-                                 PEM_read_PUBKEY(key_file, NULL, NULL, NULL);
-    fclose(key_file);
-    if (!key) print_openssl_error();
-    return key;
-}
-
-static int load_keys(const char *hash_str, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key) {
-    char *dir_path = expand_home(BASE_PATH);
-    if (!dir_path) return -1;
-    char aes_path[256], hmac_path[256], id_path[256];
-    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, hash_str);
-    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, hash_str);
-    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, hash_str);
-    free(dir_path);
-
-    FILE *file = fopen(aes_path, "rb");
-    if (!file || fread(aes_key, 1, 32, file) != 32) {
-        fprintf(stderr, "Failed to read AES key from %s: %s\n", aes_path, strerror(errno));
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-
-    file = fopen(hmac_path, "rb");
-    if (!file || fread(hmac_key, 1, 32, file) != 32) {
-        fprintf(stderr, "Failed to read HMAC key from %s: %s\n", hmac_path, strerror(errno));
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-
-    *ec_key = load_ec_key(hash_str, 1);
-    if (!*ec_key) return -1;
-    return 0;
-}
-
-static int save_public_key(const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
-    char *dir_path = expand_home(BASE_PATH);
-    if (!dir_path) return -1;
-    uint32_t hash = fnv1a_32(node_name, strlen(node_name));
-    char hash_str[16];
-    snprintf(hash_str, sizeof(hash_str), "%08x", hash);
-    char pub_path[256];
-    snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, hash_str);
-    FILE *pub_file = fopen(pub_path, "wb");
-    free(dir_path);
-    if (!pub_file || fwrite(pub_key_data, 1, pub_key_len, pub_file) != pub_key_len) {
-        fprintf(stderr, "Failed to write public key to %s: %s\n", pub_path, strerror(errno));
-        if (pub_file) fclose(pub_file);
-        return -1;
-    }
-    fclose(pub_file);
-    return 0;
-}
-
-
-static int set_non_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) return -1;
-    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <nodeName>\n", argv[0]);
@@ -141,7 +47,7 @@ int main(int argc, char *argv[]) {
     printf("Node name: %s\n", node_name);
 
     EVP_PKEY *ec_key = NULL;
-    if (load_keys(node_name, aes_key, hmac_key, &node_id, &ec_key) < 0) {
+    if (load_keys(0, node_name, aes_key, hmac_key, &node_id, &ec_key) < 0) {
         return 1;
     }
 
@@ -158,7 +64,7 @@ int main(int argc, char *argv[]) {
         char node_name[16];
         snprintf(node_name, sizeof(node_name), "%08x", topic_hash);
 
-        topic_pub_keys[i] = load_ec_key(node_name, 0);
+        topic_pub_keys[i] = load_ec_key(1, node_name, 0);
         if (!topic_pub_keys[i]) {
             fprintf(stderr, "Failed to load topic public key %s\n", topics[i]);
             EVP_PKEY_free(ec_key);
@@ -350,7 +256,7 @@ int main(int argc, char *argv[]) {
                     char hash_str[16];
                     snprintf(hash_str, sizeof(hash_str), "%08x", hash);
                     printf("Control: %s\n", hash_str);
-                    dec_key = load_ec_key(hash_str, 0);
+                    dec_key = load_ec_key(0, hash_str, 0);
                     if (!dec_key) continue;
                     if (derive_shared_key(ec_key, dec_key, dec_key_key, dec_hmac_key) < 0) {
                         EVP_PKEY_free(dec_key);

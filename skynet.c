@@ -36,106 +36,6 @@
 #define MAX_EVENTS 32
 #define NEIGHBOR_TIMEOUT_US 5000000
 #define MAX_NODE_NAME 64
-#define BASE_PATH "~/.skynet/ecc/secp384r1/"
-
-static void print_openssl_error(void) {
-    unsigned long err = ERR_get_error();
-    char err_str[256];
-    ERR_error_string_n(err, err_str, sizeof(err_str));
-    fprintf(stderr, "OpenSSL error: %s\n", err_str);
-}
-
-static char *expand_home(const char *path) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        fprintf(stderr, "HOME environment variable not set\n");
-        return NULL;
-    }
-    size_t len = strlen(home) + strlen(path) + 1;
-    char *expanded = malloc(len);
-    if (!expanded) {
-        fprintf(stderr, "Failed to allocate memory for path\n");
-        return NULL;
-    }
-    snprintf(expanded, len, "%s%s", home, path + 1);
-    return expanded;
-}
-
-static EVP_PKEY *load_ec_key(const char *node_name, int is_private) {
-    char *dir_path = expand_home(BASE_PATH);
-    if (!dir_path) return NULL;
-    char key_path[256];
-    snprintf(key_path, sizeof(key_path), "%s/%s.ec_%s", dir_path, node_name, is_private ? "priv" : "pub");
-    free(dir_path);
-    FILE *key_file = fopen(key_path, "rb");
-    if (!key_file) {
-        fprintf(stderr, "Failed to open %s: %s\n", key_path, strerror(errno));
-        return NULL;
-    }
-    EVP_PKEY *key = is_private ? PEM_read_PrivateKey(key_file, NULL, NULL, NULL) :
-                                 PEM_read_PUBKEY(key_file, NULL, NULL, NULL);
-    fclose(key_file);
-    if (!key) print_openssl_error();
-    return key;
-}
-
-static int load_keys(const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key) {
-    char *dir_path = expand_home(BASE_PATH);
-    if (!dir_path) return -1;
-    char aes_path[256], hmac_path[256], id_path[256];
-    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, node_name);
-    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, node_name);
-    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, node_name);
-    free(dir_path);
-
-    FILE *file = fopen(aes_path, "rb");
-    if (!file || fread(aes_key, 1, 32, file) != 32) {
-        fprintf(stderr, "Failed to read AES key from %s: %s\n", aes_path, file ? strerror(errno) : "null file");
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-
-    file = fopen(hmac_path, "rb");
-    if (!file || fread(hmac_key, 1, 32, file) != 32) {
-        fprintf(stderr, "Failed to read HMAC key from %s: %s\n", hmac_path, file ? strerror(errno) : "null file");
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-
-    file = fopen(id_path, "rb");
-    if (!file || fread(node_id, 1, sizeof(uint32_t), file) != sizeof(uint32_t)) {
-        fprintf(stderr, "Failed to read node ID from %s: %s\n", id_path, file ? strerror(errno) : "null file");
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-
-    *ec_key = load_ec_key(node_name, 1);
-    if (!*ec_key) return -1;
-    return 0;
-}
-
-static int save_public_key(const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
-    char *dir_path = expand_home(BASE_PATH);
-    if (!dir_path) return -1;
-    char pub_path[256];
-    snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, node_name);
-    free(dir_path);
-    FILE *pub_file = fopen(pub_path, "wb");
-    if (!pub_file) {
-        fprintf(stderr, "Failed to open %s: %s\n", pub_path, strerror(errno));
-        return -1;
-    }
-    if (fwrite(pub_key_data, 1, pub_key_len, pub_file) != pub_key_len) {
-        fprintf(stderr, "Failed to write public key to %s\n", pub_path);
-        fclose(pub_file);
-        return -1;
-    }
-    fclose(pub_file);
-    return 0;
-}
 
 typedef struct {
     struct sockaddr_in addr;
@@ -263,12 +163,6 @@ static int queue_dequeue(ServerState *state, SkyNetMessage *msg, struct sockaddr
     return 0;
 }
 
-static int set_non_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) return -1;
-    return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
 static void pin_thread(int core_id) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
@@ -282,17 +176,26 @@ static void server_init(ServerState *state, const char *node_name) {
     memset(state, 0, sizeof(ServerState));
     strncpy(state->server_name, node_name, MAX_NODE_NAME - 1);
     state->server_name[MAX_NODE_NAME - 1] = '\0';
-    if (load_keys(node_name, state->aes_key, state->hmac_key, &state->node_id, &state->ec_key)) {
+
+    printf("Node Server Init: %s\n", node_name);
+
+    if (load_keys(1, node_name, state->aes_key, state->hmac_key, &state->node_id, &state->ec_key)) {
         fprintf(stderr, "Failed to load keys\n");
         exit(1);
     }
+
+
     const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
+
     for (int i = 0; i < 8; i++) {
         uint32_t topic_hash = fnv1a_32(topics[i], strlen(topics[i]));
         char topic_name[16];
         snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
-        state->topic_priv_keys[i] = load_ec_key(topic_name, 1);
+        state->topic_priv_keys[i] = load_ec_key(1, topic_name, 1);
+
+        printf("Node Topic Init: %s %s\n", node_name, topic_name);
+
         if (!state->topic_priv_keys[i]) {
             fprintf(stderr, "Failed to load topic private key %s (%s)\n", topics[i], topic_name);
             for (int j = 0; j < i; j++) EVP_PKEY_free(state->topic_priv_keys[j]);
@@ -421,7 +324,7 @@ static void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t r
     char topic_name[16];
     snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
 
-    if (skynet_encrypt(&enc_msg, state->server_name, topic_name, msg->payload, msg->payload_len) < 0) {
+    if (skynet_encrypt(1, &enc_msg, state->server_name, topic_name, msg->payload, msg->payload_len) < 0) {
         fprintf(stderr, "Failed to encrypt message for NPG %d\n", msg->npg_id);
         return;
     }
@@ -494,7 +397,7 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
                 fprintf(stderr, "Failed to read public key from BIO\n");
                 return;
             }
-            if (skynet_encrypt(&response, state->server_name, client_name, (uint8_t *)pub_key_data, pub_key_len) < 0) {
+            if (skynet_encrypt(1, &response, state->server_name, client_name, (uint8_t *)pub_key_data, pub_key_len) < 0) {
                 fprintf(stderr, "Failed to encrypt key exchange response\n");
                 return;
             }
@@ -523,7 +426,7 @@ static void process_self_healing(ServerState *state) {
             uint32_t topic_hash = fnv1a_32(topic, strlen(topic));
             char topic_name[16];
             snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
-            if (skynet_encrypt(&msg, state->server_name, topic_name, NULL, 0) < 0) {
+            if (skynet_encrypt(1, &msg, state->server_name, topic_name, NULL, 0) < 0) {
                 fprintf(stderr, "Failed to encrypt waypoint message\n");
                 return;
             }
@@ -564,15 +467,19 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
             return;
     }
 
-    printf("RCVD [NPG:%d][%s][seq:%u][node:%x][type:%d][src:%s:%d]\n",
-           msg->npg_id, topic, msg->seq_no, msg->node_id, msg->type,
-           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
 
     char topic_name[16];
     uint32_t topic_hash = fnv1a_32(topic, strlen(topic));
     snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
 
-    if (skynet_decrypt(msg, (msg->npg_id == SKYNET_NPG_CONTROL ? state->server_name : to_name), from_name) < 0) {
+    char *to = (msg->npg_id == SKYNET_NPG_CONTROL ? state->server_name : to_name);
+    char *from = from_name;
+
+    printf("RCVD [NPG:%d][%s][seq:%u][node:%x][type:%d][src:%s:%d][server:%s][from:%s][to:%s]\n",
+           msg->npg_id, topic, msg->seq_no, msg->node_id, msg->type,
+           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port), state->server_name, from, to);
+
+    if (skynet_decrypt(1, msg, to, from_name) < 0) {
         fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
         return;
     }
