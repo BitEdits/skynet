@@ -488,7 +488,9 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
     if (msg->type == SKYNET_MSG_KEY_EXCHANGE && msg->npg_id == SKYNET_NPG_CONTROL) {
 
         // don't decrypt
+
     } else {
+
         // decrypt
 
         hex_dump("SKY HEX DUMP", (const uint8_t *)msg, 309);
@@ -577,13 +579,8 @@ static void *worker_thread(void *arg) {
                     }
                 }
 
-//                skynet_print(&msg);
-
-                if (node) {
-                    handle_message(state, node, &msg, recv_time, &addr);
-                } else {
-                    fprintf(stderr, "No node found for ID %u\n", msg.node_id);
-                }
+                if (node) { handle_message(state, node, &msg, recv_time, &addr); }
+                     else { fprintf(stderr, "No node found for ID %u\n", msg.node_id); }
             }
         }
     }

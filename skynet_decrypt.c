@@ -98,10 +98,16 @@ int main(int argc, char *argv[]) {
     snprintf(to_node_name, sizeof(to_node_name), "%08x", to_node_hash);
 
     const char *encrypted_file_name = argv[3];
+    size_t file_len;
+    uint8_t *encrypted_data = read_encrypted_file(encrypted_file_name, &file_len);
+    if (!encrypted_data) {
+        return 1;
+    }
 
-    fprintf(stderr, "Debug: Starting decryption: to=%s, from=%s, file=%s\n",
-            to_node_name, from_node_name, encrypted_file_name);
+    fprintf(stderr, "Debug: Starting decryption: to=%s, from=%s, file=%s\n",  to_node_name, from_node_name, encrypted_file_name);
 
+    SkyNetMessage msg;
+/*
     EVP_PKEY *priv_key = load_ec_key(1, to_node_name, 1);
     EVP_PKEY *peer_pub_key = load_ec_key(0, from_node_name, 0);
 
@@ -120,14 +126,8 @@ int main(int argc, char *argv[]) {
 
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
+*/
 
-    size_t file_len;
-    uint8_t *encrypted_data = read_encrypted_file(encrypted_file_name, &file_len);
-    if (!encrypted_data) {
-        return 1;
-    }
-
-    SkyNetMessage msg;
     fprintf(stderr, "Debug: Deserializing message with size %d\n", file_len);
     if (skynet_deserialize(&msg, encrypted_data, file_len) < 0) {
         fprintf(stderr, "Failed to deserialize message\n");
@@ -136,6 +136,9 @@ int main(int argc, char *argv[]) {
     }
     free(encrypted_data);
 
+    skynet_decrypt(1, &msg, to_node_name, from_node_name);
+
+/*
     fprintf(stderr, "Debug: Verifying HMAC\n");
     if (skynet_verify_hmac(&msg, hmac_key) < 0) {
         fprintf(stderr, "HMAC verification failed\n");
@@ -147,7 +150,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to decrypt payload\n");
         return 1;
     }
-
+*/
     hex_dump("decrypt", &msg, 200);
 
     char out_path[256];

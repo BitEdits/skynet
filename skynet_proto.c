@@ -243,12 +243,12 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, const char *to_node, const char 
 
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
-/*
+
     if (skynet_verify_hmac(msg, hmac_key) < 0) {
         fprintf(stderr, "Error: HMAC verification failed\n");
         return -1;
     }
-*/
+
     if (skynet_decrypt_payload(msg, aes_key) < 0) {
         fprintf(stderr, "Error: Payload decryption failed\n");
         return -1;

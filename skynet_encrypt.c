@@ -100,10 +100,20 @@ int main(int argc, char *argv[]) {
     snprintf(to_node_name, sizeof(to_node_name), "%08x", to_node_hash);
 
     const char *payload_file_name = argv[3];
+    size_t payload_len;
+    uint8_t *payload = read_payload_file(payload_file_name, &payload_len);
+    if (!payload) {
+        fprintf(stderr, "Error reading payload %s.\n", payload_file_name);
+        return 1;
+    }
 
-    fprintf(stderr, "Debug: Starting encryption: from=%s, to=%s, file=%s\n",
-            from_node_name, to_node_name, payload_file_name);
+    fprintf(stderr, "Debug: Starting encryption: from=%s, to=%s, file=%s\n", from_node_name, to_node_name, payload_file_name);
 
+    SkyNetMessage msg;
+
+    skynet_encrypt(1, &msg, from_node_hash, to_node_hash, payload, payload_len);
+
+/*
     EVP_PKEY *priv_key = load_ec_key(0, from_node_name, 1);
     EVP_PKEY *peer_pub_key = load_ec_key(1, to_node_name, 0);
     if (!priv_key || !peer_pub_key) {
@@ -122,11 +132,6 @@ int main(int argc, char *argv[]) {
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
 
-    size_t payload_len;
-    uint8_t *payload = read_payload_file(payload_file_name, &payload_len);
-    if (!payload) {
-        return 1;
-    }
 
     SkyNetMessage msg;
     uint32_t node_id = fnv1a_32(from_node_name, strlen(from_node_name));
@@ -155,6 +160,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     fprintf(stderr, "Debug: Message data set, payload_len=%u\n", msg.payload_len);
+*/
+
+    hex_dump("encrypt", &msg, 200);
 
     uint8_t buffer[MAX_BUFFER];
     fprintf(stderr, "Debug: Serializing message\n");
@@ -167,8 +175,6 @@ int main(int argc, char *argv[]) {
     char pub_path[256];
     snprintf(pub_path, sizeof(pub_path), "%s.sky", payload_file_name);
     FILE *pub_file = fopen(pub_path, "wb");
-
-    hex_dump("encrypt", &msg, 200);
 
     if (!pub_file || fwrite(buffer, 1, len, pub_file) != len) {
         fprintf(stderr, "Failed to write encoded message to %s.\n", pub_path);
