@@ -1,0 +1,10 @@
+./skynet_keygen npg_control --server
+./skynet_keygen npg_pli --server
+./skynet_keygen npg_surveillance --server
+./skynet_keygen npg_chat --server
+./skynet_keygen npg_c2 --server
+./skynet_keygen npg_alerts --server
+./skynet_keygen npg_logistics --server
+./skynet_keygen npg_coord --server
+./skynet_keygen server --server
+./skynet_keygen client --client
