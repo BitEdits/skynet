@@ -90,15 +90,7 @@ static int load_keys(const char *hash_str, uint8_t *aes_key, uint8_t *hmac_key, 
         return -1;
     }
     fclose(file);
-/*
-    file = fopen(id_path, "rb");
-    if (!file || fread(node_id, 1, sizeof(uint32_t), file) != sizeof(uint32_t)) {
-        fprintf(stderr, "Failed to read node ID from %s: %s\n", id_path, strerror(errno));
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-*/
+
     *ec_key = load_ec_key(hash_str, 1);
     if (!*ec_key) return -1;
     return 0;
@@ -123,69 +115,6 @@ static int save_public_key(const char *node_name, const uint8_t *pub_key_data, s
     return 0;
 }
 
-static int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key) {
-    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(priv_key, NULL);
-    if (!ctx || EVP_PKEY_derive_init(ctx) <= 0) {
-        print_openssl_error();
-        EVP_PKEY_CTX_free(ctx);
-        return -1;
-    }
-    if (EVP_PKEY_derive_set_peer(ctx, peer_pub_key) <= 0) {
-        print_openssl_error();
-        EVP_PKEY_CTX_free(ctx);
-        return -1;
-    }
-    size_t secret_len;
-    if (EVP_PKEY_derive(ctx, NULL, &secret_len) <= 0) {
-        print_openssl_error();
-        EVP_PKEY_CTX_free(ctx);
-        return -1;
-    }
-    uint8_t *shared_secret = malloc(secret_len);
-    if (!shared_secret || EVP_PKEY_derive(ctx, shared_secret, &secret_len) <= 0) {
-        print_openssl_error();
-        free(shared_secret);
-        EVP_PKEY_CTX_free(ctx);
-        return -1;
-    }
-    EVP_PKEY_CTX_free(ctx);
-
-    EVP_KDF *kdf = EVP_KDF_fetch(NULL, "HKDF", NULL);
-    EVP_KDF_CTX *kdf_ctx = EVP_KDF_CTX_new(kdf);
-    if (!kdf_ctx) {
-        print_openssl_error();
-        free(shared_secret);
-        EVP_KDF_free(kdf);
-        return -1;
-    }
-    OSSL_PARAM params[] = {
-        OSSL_PARAM_construct_utf8_string("digest", "SHA256", 0),
-        OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len),
-        OSSL_PARAM_construct_end()
-    };
-    if (EVP_KDF_derive(kdf_ctx, aes_key, 32, params) <= 0) {
-        print_openssl_error();
-        EVP_KDF_CTX_free(kdf_ctx);
-        EVP_KDF_free(kdf);
-        free(shared_secret);
-        return -1;
-    }
-    params[0] = OSSL_PARAM_construct_utf8_string("digest", "SHA256", 0);
-    params[1] = OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len);
-    params[2] = OSSL_PARAM_construct_octet_string("info", (unsigned char *)"HMAC", 4);
-    params[3] = OSSL_PARAM_construct_end();
-    if (EVP_KDF_derive(kdf_ctx, hmac_key, 32, params) <= 0) {
-        print_openssl_error();
-        EVP_KDF_CTX_free(kdf_ctx);
-        EVP_KDF_free(kdf);
-        free(shared_secret);
-        return -1;
-    }
-    EVP_KDF_CTX_free(kdf_ctx);
-    EVP_KDF_free(kdf);
-    free(shared_secret);
-    return 0;
-}
 
 static int set_non_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -221,6 +150,7 @@ int main(int argc, char *argv[]) {
     // Load topic public keys
     const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
+
     EVP_PKEY *topic_pub_keys[8] = {0};
     for (int i = 0; i < 8; i++) {
 
@@ -274,6 +204,7 @@ int main(int argc, char *argv[]) {
     };
     uint8_t npgs[] = { SKYNET_NPG_CONTROL, SKYNET_NPG_PLI, SKYNET_NPG_SURVEILLANCE, SKYNET_NPG_CHAT,
                        SKYNET_NPG_C2, SKYNET_NPG_ALERTS, SKYNET_NPG_LOGISTICS, SKYNET_NPG_COORD };
+
     for (size_t i = 0; i < sizeof(npgs) / sizeof(npgs[0]); i++) {
         char mcast_ip[16];
         snprintf(mcast_ip, sizeof(mcast_ip), "239.255.0.%d", npgs[i]);

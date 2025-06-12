@@ -43,6 +43,8 @@ static char *expand_home(const char *path) {
 static const char *get_base_path(const char *node_name) {
     if (strcmp(node_name, "server") == 0) return SERVER_BASE_PATH;
     if (strcmp(node_name, "client") == 0) return CLIENT_BASE_PATH;
+    if (strcmp(node_name, "40ac3dd2") == 0) return SERVER_BASE_PATH;
+    if (strcmp(node_name, " 8f929c1e") == 0) return CLIENT_BASE_PATH;
     return NULL;
 }
 
@@ -95,7 +97,7 @@ static EVP_PKEY *load_ec_key(const char *node_name, int is_private) {
     return key;
 }
 
-static int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key) {
+int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key) {
     EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(priv_key, NULL);
     if (!ctx || EVP_PKEY_derive_init(ctx) <= 0) {
         print_openssl_error();

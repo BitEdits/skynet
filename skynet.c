@@ -533,14 +533,22 @@ static void process_self_healing(ServerState *state) {
 }
 
 static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
+
     node->last_seen = get_time_us();
+
     if (msg->version != SKYNET_VERSION) {
         fprintf(stderr, "Invalid version %d from node %u\n", msg->version, msg->node_id);
         return;
     }
 
-    char sender_name[16];
-    snprintf(sender_name, sizeof(sender_name), "%08x", msg->node_id);
+    skynet_print(msg);
+
+    char from_name[16];
+    snprintf(from_name, sizeof(from_name), "%08x", msg->node_id);
+
+    char to_name[16];
+    snprintf(to_name, sizeof(to_name), "%08x", msg->npg_id);
+
     const char *topic = NULL;
     switch (msg->npg_id) {
         case SKYNET_NPG_CONTROL: topic = "npg_control"; break;
@@ -556,11 +564,15 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
             return;
     }
 
+    printf("RCVD [NPG:%d][%s][seq:%u][node:%x][type:%d][src:%s:%d]\n",
+           msg->npg_id, topic, msg->seq_no, msg->node_id, msg->type,
+           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+
     char topic_name[16];
     uint32_t topic_hash = fnv1a_32(topic, strlen(topic));
     snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
 
-    if (skynet_decrypt(msg, state->server_name, msg->npg_id == SKYNET_NPG_CONTROL ? sender_name : topic_name) < 0) {
+    if (skynet_decrypt(msg, (msg->npg_id == SKYNET_NPG_CONTROL ? state->server_name : to_name), from_name) < 0) {
         fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
         return;
     }
@@ -569,9 +581,6 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
         return;
     }
 
-    printf("RCVD [NPG:%d][%s][seq:%u][node:%u][type:%d][src:%s:%d]\n",
-           msg->npg_id, topic, msg->seq_no, msg->node_id, msg->type,
-           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
 
     switch (msg->type) {
         case SKYNET_MSG_PUBLIC:
@@ -616,6 +625,8 @@ static void *worker_thread(void *arg) {
             struct sockaddr_in addr;
             uint64_t recv_time;
             while (queue_dequeue(state, &msg, &addr, &recv_time) == 0) {
+
+
                 NodeState *node = NULL;
                 if (msg.type == SKYNET_MSG_KEY_EXCHANGE) {
                     char node_name[16];
@@ -635,6 +646,9 @@ static void *worker_thread(void *arg) {
                         }
                     }
                 }
+
+//                skynet_print(&msg);
+
                 if (node) {
                     handle_message(state, node, &msg, recv_time, &addr);
                 } else {
@@ -708,8 +722,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
         return 1;
     }
-    printf("SkyNet server bound to %s:%d\n",
-           inet_ntoa(state.server_addr.sin_addr), ntohs(state.server_addr.sin_port));
+    printf("SkyNet server bound to %s:%d\n", inet_ntoa(state.server_addr.sin_addr), ntohs(state.server_addr.sin_port));
 
     uint8_t npgs[] = { SKYNET_NPG_CONTROL, SKYNET_NPG_PLI, SKYNET_NPG_SURVEILLANCE, SKYNET_NPG_CHAT,
                        SKYNET_NPG_C2, SKYNET_NPG_ALERTS, SKYNET_NPG_LOGISTICS, SKYNET_NPG_COORD };

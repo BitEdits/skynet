@@ -107,5 +107,6 @@ int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key);
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key);
 int skynet_encrypt(SkyNetMessage *msg, const char *from_node, const char *to_node, const uint8_t *data, uint16_t data_len);
 int skynet_decrypt(SkyNetMessage *msg, const char *to_node, const char *from_node);
+int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key);
 
 #endif /* SKYNET_H */
