@@ -40,6 +40,7 @@ int main(int argc, char *argv[]) {
     }
 
     uint8_t aes_key[32], hmac_key[32];
+    uint32_t node_id2;
     uint32_t node_id = fnv1a_32(argname, strlen(argname));
     char node_name[16];
     snprintf(node_name, sizeof(node_name), "%08x", node_id);
@@ -47,7 +48,7 @@ int main(int argc, char *argv[]) {
     printf("Node name: %s\n", node_name);
 
     EVP_PKEY *ec_key = NULL;
-    if (load_keys(0, node_name, aes_key, hmac_key, &node_id, &ec_key) < 0) {
+    if (load_keys(0, node_name, aes_key, hmac_key, &node_id2, &ec_key) < 0) {
         return 1;
     }
 

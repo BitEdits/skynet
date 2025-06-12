@@ -243,13 +243,9 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, const char *to_node, const char 
         fprintf(stderr, "Node name too long (max %d characters)\n", MAX_NODE_NAME - 1);
         return -1;
     }
-    if (strcmp(to_node, from_node) == 0) {
-        fprintf(stderr, "Error: to_node and from_node must be different\n");
-        return -1;
-    }
 
-    EVP_PKEY *priv_key = load_ec_key(srv, to_node, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(srv, from_node, 0);
+    EVP_PKEY *priv_key = load_ec_key(1, to_node, 1);
+    EVP_PKEY *peer_pub_key = load_ec_key(0, from_node, 0);
     if (!priv_key || !peer_pub_key) {
         EVP_PKEY_free(priv_key);
         EVP_PKEY_free(peer_pub_key);
@@ -265,12 +261,12 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, const char *to_node, const char 
 
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
-/*
+
     if (skynet_verify_hmac(msg, hmac_key) < 0) {
         fprintf(stderr, "Error: HMAC verification failed\n");
         return -1;
     }
-*/
+
     if (skynet_decrypt_payload(msg, aes_key) < 0) {
         fprintf(stderr, "Error: Payload decryption failed\n");
         return -1;
