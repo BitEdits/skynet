@@ -63,11 +63,6 @@ char *build_key_path(int srv, const char *node_name, const char *suffix) {
     }
     char *dir_path = expand_home(base_path);
     if (!dir_path) return NULL;
-/*    
-    uint32_t hash = fnv1a_32(node_name, strlen(node_name));
-    char hash_str[HASH_STR_LEN];
-    snprintf(hash_str, sizeof(hash_str), "%08x", hash);
-  */
 
     size_t path_len = strlen(dir_path) + 1 + strlen(node_name) + strlen(suffix) + 1;
     char *path = malloc(path_len);
@@ -76,7 +71,7 @@ char *build_key_path(int srv, const char *node_name, const char *suffix) {
         free(dir_path);
         return NULL;
     }
-    
+
     snprintf(path, path_len, "%s/%s%s", dir_path, node_name, suffix);
     free(dir_path);
     return path;
@@ -85,19 +80,19 @@ char *build_key_path(int srv, const char *node_name, const char *suffix) {
 EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private) {
     char *key_path = build_key_path(srv, node_name, is_private ? ".ec_priv" : ".ec_pub");
     if (!key_path) return NULL;
-    
+
     FILE *key_file = fopen(key_path, "rb");
     if (!key_file) {
         fprintf(stderr, "Failed to open %s: %s\n", key_path, strerror(errno));
         free(key_path);
         return NULL;
     }
-    
+
     EVP_PKEY *key = is_private ? PEM_read_PrivateKey(key_file, NULL, NULL, NULL) :
                                  PEM_read_PUBKEY(key_file, NULL, NULL, NULL);
     fclose(key_file);
     free(key_path);
-    
+
     if (!key) {
         print_openssl_error();
         return NULL;
@@ -112,20 +107,20 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         EVP_PKEY_CTX_free(ctx);
         return -1;
     }
-    
+
     if (EVP_PKEY_derive_set_peer(ctx, peer_pub_key) <= 0) {
         print_openssl_error();
         EVP_PKEY_CTX_free(ctx);
         return -1;
     }
-    
+
     size_t secret_len;
     if (EVP_PKEY_derive(ctx, NULL, &secret_len) <= 0) {
         print_openssl_error();
         EVP_PKEY_CTX_free(ctx);
         return -1;
     }
-    
+
     uint8_t *shared_secret = malloc(secret_len);
     if (!shared_secret || EVP_PKEY_derive(ctx, shared_secret, &secret_len) <= 0) {
         print_openssl_error();
@@ -143,13 +138,13 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         EVP_KDF_free(kdf);
         return -1;
     }
-    
+
     OSSL_PARAM aes_params[] = {
         OSSL_PARAM_construct_utf8_string("digest", "SHA256", 0),
         OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len),
         OSSL_PARAM_construct_end()
     };
-    
+
     if (EVP_KDF_derive(kdf_ctx, aes_key, 32, aes_params) <= 0) {
         print_openssl_error();
         EVP_KDF_CTX_free(kdf_ctx);
@@ -157,14 +152,14 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         free(shared_secret);
         return -1;
     }
-    
+
     OSSL_PARAM hmac_params[] = {
         OSSL_PARAM_construct_utf8_string("digest", "SHA256", 0),
         OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len),
         OSSL_PARAM_construct_octet_string("info", (unsigned char *)"HMAC", 4),
         OSSL_PARAM_construct_end()
     };
-    
+
     if (EVP_KDF_derive(kdf_ctx, hmac_key, 32, hmac_params) <= 0) {
         print_openssl_error();
         EVP_KDF_CTX_free(kdf_ctx);
@@ -172,7 +167,7 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         free(shared_secret);
         return -1;
     }
-    
+
     EVP_KDF_CTX_free(kdf_ctx);
     EVP_KDF_free(kdf);
     free(shared_secret);

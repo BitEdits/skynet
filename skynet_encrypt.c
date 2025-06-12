@@ -29,55 +29,55 @@ static uint8_t *read_payload_file(const char *filename, size_t *payload_len) {
         fprintf(stderr, "Failed to open payload file %s: %s\n", filename, strerror(errno));
         return NULL;
     }
-    
+
     if (fseek(file, 0, SEEK_END) != 0) {
         fprintf(stderr, "Failed to seek to end of file %s\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     long file_size = ftell(file);
     if (file_size < 0) {
         fprintf(stderr, "Failed to get size of file %s\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     if (file_size == 0) {
         fprintf(stderr, "Payload file %s is empty\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     if (file_size > SKYNET_MAX_PAYLOAD - 16) { /* Reserve 16 bytes for GCM tag */
         fprintf(stderr, "Payload file too large (%ld bytes, max %d)\n", file_size, SKYNET_MAX_PAYLOAD - 16);
         fclose(file);
         return NULL;
     }
-    
+
     *payload_len = (size_t)file_size;
     fprintf(stderr, "Debug: Payload file size: %zu bytes\n", *payload_len);
-    
+
     if (fseek(file, 0, SEEK_SET) != 0) {
         fprintf(stderr, "Failed to seek to start of file %s\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     uint8_t *payload = malloc(*payload_len);
     if (!payload) {
         fprintf(stderr, "Failed to allocate memory for payload\n");
         fclose(file);
         return NULL;
     }
-    
+
     if (fread(payload, 1, *payload_len, file) != *payload_len) {
         fprintf(stderr, "Failed to read payload file %s\n", filename);
         free(payload);
         fclose(file);
         return NULL;
     }
-    
+
     fclose(file);
     fprintf(stderr, "Debug: Successfully read %zu bytes from %s\n", *payload_len, filename);
     return payload;
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
         EVP_PKEY_free(peer_pub_key);
         return 1;
     }
-    
+
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
 

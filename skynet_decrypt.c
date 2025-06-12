@@ -28,55 +28,55 @@ static uint8_t *read_encrypted_file(const char *filename, size_t *file_len) {
         fprintf(stderr, "Failed to open encrypted file %s: %s\n", filename, strerror(errno));
         return NULL;
     }
-    
+
     if (fseek(file, 0, SEEK_END) != 0) {
         fprintf(stderr, "Failed to seek to end of file %s\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     long file_size = ftell(file);
     if (file_size < 0) {
         fprintf(stderr, "Failed to get size of file %s\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     if (file_size == 0) {
         fprintf(stderr, "Encrypted file %s is empty\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     if (file_size > MAX_BUFFER) {
         fprintf(stderr, "Encrypted file too large (%ld bytes, max %d)\n", file_size, MAX_BUFFER);
         fclose(file);
         return NULL;
     }
-    
+
     *file_len = (size_t)file_size;
     fprintf(stderr, "Debug: Encrypted file size: %zu bytes\n", *file_len);
-    
+
     if (fseek(file, 0, SEEK_SET) != 0) {
         fprintf(stderr, "Failed to seek to start of file %s\n", filename);
         fclose(file);
         return NULL;
     }
-    
+
     uint8_t *buffer = malloc(*file_len);
     if (!buffer) {
         fprintf(stderr, "Failed to allocate memory for encrypted file\n");
         fclose(file);
         return NULL;
     }
-    
+
     if (fread(buffer, 1, *file_len, file) != *file_len) {
         fprintf(stderr, "Failed to read encrypted file %s\n", filename);
         free(buffer);
         fclose(file);
         return NULL;
     }
-    
+
     fclose(file);
     fprintf(stderr, "Debug: Successfully read %zu bytes from %s\n", *file_len, filename);
     return buffer;
