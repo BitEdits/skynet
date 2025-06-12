@@ -155,6 +155,21 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
+
+    EVP_PKEY *priv_key = load_ec_key(0, node_name, 1);
+    EVP_PKEY *public_key = load_ec_key(1, "40ac3dd2", 1);
+
+    if (!priv_key) {
+        EVP_PKEY_free(priv_key);
+        return 1;
+    }
+
+    if (derive_shared_key(priv_key, public_key, aes_key, hmac_key) < 0) {
+        EVP_PKEY_free(priv_key);
+        EVP_PKEY_free(public_key);
+        return 1;
+    }
+
     printf("Node name: %s\n", node_name);
     skynet_set_data(&msg, (uint8_t *)pub_key_data, pub_key_len, aes_key, hmac_key);
     skynet_print(&msg);

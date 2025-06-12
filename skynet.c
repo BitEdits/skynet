@@ -315,7 +315,7 @@ static void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t r
     char topic_name[16];
     snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
 
-    if (skynet_encrypt(1, &enc_msg, state->server_name, topic_name, msg->payload, msg->payload_len) < 0) {
+    if (skynet_encrypt(1, &enc_msg, 0x40ac3dd2, topic_hash, msg->payload, msg->payload_len) < 0) {
         fprintf(stderr, "Failed to encrypt message for NPG %d\n", msg->npg_id);
         return;
     }
@@ -373,7 +373,7 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
         if (save_public_key(client_name, msg->payload, msg->payload_len) == 0) {
             printf("Saved public key for client %s\n", client_name);
             SkyNetMessage response;
-            skynet_init(&response, SKYNET_MSG_KEY_EXCHANGE, state->node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
+            skynet_init(&response, 0x40ac3dd2, msg->node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
             response.seq_no = state->current_slot;
             BIO *bio = BIO_new(BIO_s_mem());
             if (!bio || !PEM_write_bio_PUBKEY(bio, state->ec_key)) {
@@ -388,7 +388,13 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
                 fprintf(stderr, "Failed to read public key from BIO\n");
                 return;
             }
-            if (skynet_encrypt(1, &response, state->server_name, client_name, (uint8_t *)pub_key_data, pub_key_len) < 0) {
+            char to[16];
+            char from[16];
+            snprintf(from, 16, "%08x", 0x40ac3dd2);
+            snprintf(to, 16, "%08x", msg->node_id);
+            printf("from: %s\n", from);
+            printf("to: %s\n", to);
+            if (skynet_encrypt(1, &response, 0x40ac3dd2, msg->node_id, "OK", 2) < 0) {
                 fprintf(stderr, "Failed to encrypt key exchange response\n");
                 return;
             }
@@ -417,7 +423,7 @@ static void process_self_healing(ServerState *state) {
             uint32_t topic_hash = fnv1a_32(topic, strlen(topic));
             char topic_name[16];
             snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
-            if (skynet_encrypt(1, &msg, state->server_name, topic_name, NULL, 0) < 0) {
+            if (skynet_encrypt(1, &msg, 0x40ac3dd2, topic_hash, NULL, 0) < 0) {
                 fprintf(stderr, "Failed to encrypt waypoint message\n");
                 return;
             }
@@ -427,6 +433,8 @@ static void process_self_healing(ServerState *state) {
 }
 
 static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
+
+    uint8_t aes_key[32], hmac_key[32];
 
     node->last_seen = get_time_us();
 
@@ -459,29 +467,51 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
     }
 
 
-    char topic_name[16];
+    char topic_str[16];
     uint32_t topic_hash = fnv1a_32(topic, strlen(topic));
-    snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
+    snprintf(topic_str, 16, "%08x", topic_hash);
 
-    char *to = (msg->npg_id == SKYNET_NPG_CONTROL ? state->server_name : to_name);
-    char *from = from_name;
+    uint32_t to = (msg->npg_id == SKYNET_NPG_CONTROL ? 0x40ac3dd2 : topic_hash);
+    char to_str[16];
+    char from_str[16];
+    snprintf(to_str, 16, "%08x", to);
+    snprintf(from_str, 16, "%08x", msg->node_id);
 
-    printf("RCVD [NPG:%d][%s][seq:%u][node:%x][type:%d][src:%s:%d][server:%s][from:%s][to:%s]\n",
+    printf("RCVD [NPG:%d][%s][seq:%u][node:%x][type:%d][src:%s:%d][server:%s][to:%s]\n",
            msg->npg_id, topic, msg->seq_no, msg->node_id, msg->type,
-           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port), state->server_name, from, to);
-
-    hex_dump("SKY HEX DUMP", msg, 309);
-
-    if (skynet_decrypt(1, msg, to, from_name) < 0) {
-        fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
-        return;
-    }
+           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port), state->server_name, to_str);
 
     if (is_duplicate(state, msg->node_id, msg->seq_no, msg->type, addr)) {
         return;
     }
 
+    if (msg->type == SKYNET_MSG_KEY_EXCHANGE && msg->npg_id == SKYNET_NPG_CONTROL) {
 
+        // don't decrypt
+    } else {
+        // decrypt
+
+        hex_dump("SKY HEX DUMP", (const uint8_t *)msg, 309);
+
+        EVP_PKEY *priv_key = load_ec_key(0, to_str, 1);
+        EVP_PKEY *public_key = load_ec_key(1, from_str, 1);
+
+        if (!priv_key) {
+            EVP_PKEY_free(priv_key);
+            return;
+        }
+
+        if (derive_shared_key(priv_key, public_key, aes_key, hmac_key) < 0) {
+            EVP_PKEY_free(priv_key);
+            EVP_PKEY_free(public_key);
+            return;
+        }
+
+        if (skynet_decrypt(1, msg, from_str, topic_str) < 0) {
+            fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
+            return;
+        }
+    }
     switch (msg->type) {
         case SKYNET_MSG_PUBLIC:
         case SKYNET_MSG_CHAT:
@@ -489,14 +519,14 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
         case SKYNET_MSG_WAYPOINT:
         case SKYNET_MSG_STATUS:
         case SKYNET_MSG_FORMATION:
-            send_to_npg(state, msg, recv_time);
-            break;
+             send_to_npg(state, msg, recv_time);
+             break;
         case SKYNET_MSG_KEY_EXCHANGE:
         case SKYNET_MSG_SLOT_REQUEST:
-            process_control(state, node, msg, recv_time, addr);
-            break;
+             process_control(state, node, msg, recv_time, addr);
+             break;
         default:
-            printf("Unsupported message type: %d\n", msg->type);
+             printf("Unsupported message type: %d\n", msg->type);
     }
 }
 
@@ -727,7 +757,7 @@ int main(int argc, char *argv[]) {
 
                 SkyNetMessage msg;
 
-                printf("SERIALIZED LEN: %d\n", len);
+                printf("SERIALIZED LEN: %li\n", len);
 
                 if (skynet_deserialize(&msg, buffer, len) < 0) {
                     fprintf(stderr, "Failed to deserialize message from %s:%d\n",

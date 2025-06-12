@@ -174,32 +174,17 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
     return 0;
 }
 
-int skynet_encrypt(int srv, SkyNetMessage *msg, const char *from_node, const char *to_node, const uint8_t *data, uint16_t data_len) {
+int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len) {
 
-    if (!msg || !from_node || !to_node || !data) {
-        fprintf(stderr, "Error: Null pointer in skynet_encrypt\n");
-        return -1;
-    }
     if (data_len > SKYNET_MAX_PAYLOAD - 16) {
         fprintf(stderr, "Error: Payload too large: %u > %u\n", data_len, SKYNET_MAX_PAYLOAD - 16);
         return -1;
     }
-    if (strlen(from_node) >= MAX_NODE_NAME || strlen(to_node) >= MAX_NODE_NAME) {
-        fprintf(stderr, "Node name too long (max %d characters)\n", MAX_NODE_NAME - 1);
-        return -1;
-    }
-    if (strcmp(from_node, to_node) == 0) {
-        fprintf(stderr, "Error: from_node and to_node must be different\n");
-        return -1;
-    }
 
-    uint32_t from_hash = fnv1a_32(from_node, strlen(from_node));
-    uint32_t to_hash = fnv1a_32(to_node, strlen(to_node));
     char to_name[16];
     char from_name[16];
-    snprintf(to_name, sizeof(to_name), "%08x", to_hash);
-    snprintf(from_name, sizeof(from_name), "%08x", from_hash);
-
+    snprintf(to_name, sizeof(to_name), "%08x", to_node);
+    snprintf(from_name, sizeof(from_name), "%08x", from_node);
 
     EVP_PKEY *priv_key = load_ec_key(1, from_name, 1);
     EVP_PKEY *peer_pub_key = load_ec_key(0, to_name, 0);
@@ -574,22 +559,6 @@ int load_keys(int srv, const char *node_name, uint8_t *aes_key, uint8_t *hmac_ke
     FILE *file = fopen(aes_path, "rb");
     if (!file || fread(aes_key, 1, 32, file) != 32) {
         fprintf(stderr, "Failed to read AES key from %s: %s\n", aes_path, file ? strerror(errno) : "null file");
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-
-    file = fopen(hmac_path, "rb");
-    if (!file || fread(hmac_key, 1, 32, file) != 32) {
-        fprintf(stderr, "Failed to read HMAC key from %s: %s\n", hmac_path, file ? strerror(errno) : "null file");
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
-
-    file = fopen(id_path, "rb");
-    if (!file || fread(node_id, 1, sizeof(uint32_t), file) != sizeof(uint32_t)) {
-        fprintf(stderr, "Failed to read node ID from %s: %s\n", id_path, file ? strerror(errno) : "null file");
         if (file) fclose(file);
         return -1;
     }
