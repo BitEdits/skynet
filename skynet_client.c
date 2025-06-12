@@ -307,6 +307,7 @@ int main(int argc, char *argv[]) {
     memcpy(key_exchange_data + strlen(node_name) + 1, pub_key_data, pub_key_len);
     skynet_set_data(&msg, (uint8_t *)key_exchange_data, strlen(node_name) + 1 + pub_key_len, aes_key, hmac_key);
     int len = skynet_serialize(&msg, buffer, MAX_BUFFER);
+//    skynet_print((SkyNetMessage *)buffer);
     if (len > 0) {
         if (sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&npg_addrs[0], sizeof(npg_addrs[0])) < 0) {
             perror("Send key exchange failed");
