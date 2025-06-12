@@ -6,7 +6,7 @@
 
 #define SKYNET_VERSION 1
 #define SKYNET_MAX_NODES 11000
-#define SKYNET_MAX_PAYLOAD 512
+#define SKYNET_MAX_PAYLOAD 500
 #define SKYNET_TIME_SLOT_US 1000
 #define SKYNET_NPG_MAX 255
 #define SKYNET_FREQ_MIN_MHZ 400
@@ -79,17 +79,17 @@ typedef enum {
 } NodeRole;
 
 typedef struct {
-    uint8_t version;
-    uint8_t type;
-    uint32_t npg_id;
-    uint32_t node_id;
-    uint32_t seq_no;
-    uint64_t timestamp;
-    uint8_t qos;
-    uint8_t hop_count;
-    uint8_t iv[16];
-    uint16_t payload_len;
-    uint8_t payload[512];
+    uint8_t version; // 1
+    uint8_t type; // 2
+    uint32_t npg_id; // 3
+    uint32_t node_id; // 7
+    uint32_t seq_no; // 11
+    uint64_t timestamp; // 15
+    uint8_t qos; // 23
+    uint8_t hop_count; // 24
+    uint8_t iv[16]; // 25
+    uint16_t payload_len; // 27
+    uint8_t payload[500];
     uint8_t hmac[32];
     uint32_t crc;
 } SkyNetMessage;
@@ -115,5 +115,7 @@ int save_public_key(const char *node_name, const uint8_t *pub_key_data, size_t p
 void print_openssl_error(void);
 char *expand_home(const char *path);
 int set_non_blocking(int fd);
+uint64_t get_time_us(void);
+void hex_dump(const char *label, const uint8_t *data, size_t len);
 
 #endif /* SKYNET_H */

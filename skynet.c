@@ -92,15 +92,6 @@ typedef struct {
     int epoll_fd;
 } WorkerState;
 
-static uint64_t get_time_us(void) {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0) {
-        perror("clock_gettime failed");
-        return 0;
-    }
-    return (uint64_t)ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL;
-}
-
 static uint32_t crc32(const uint8_t *data, size_t len) {
     uint32_t crc = 0xFFFFFFFF;
     for (size_t i = 0; i < len; i++) {
@@ -479,6 +470,8 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
            msg->npg_id, topic, msg->seq_no, msg->node_id, msg->type,
            inet_ntoa(addr->sin_addr), ntohs(addr->sin_port), state->server_name, from, to);
 
+    hex_dump("SKY HEX DUMP", msg, 309);
+
     if (skynet_decrypt(1, msg, to, from_name) < 0) {
         fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
         return;
@@ -724,18 +717,24 @@ int main(int argc, char *argv[]) {
                 struct sockaddr_in addr;
                 socklen_t addr_len = sizeof(addr);
                 ssize_t len = recvfrom(state.socket_fd, buffer, MAX_BUFFER, 0, (struct sockaddr *)&addr, &addr_len);
+
                 if (len < 0) {
                     if (errno != EAGAIN && errno != EWOULDBLOCK) {
                         perror("recvfrom failed");
                     }
                     continue;
                 }
+
                 SkyNetMessage msg;
+
+                printf("SERIALIZED LEN: %d\n", len);
+
                 if (skynet_deserialize(&msg, buffer, len) < 0) {
                     fprintf(stderr, "Failed to deserialize message from %s:%d\n",
                             inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
                     continue;
                 }
+
                 uint64_t recv_time = get_time_us();
                 if (queue_enqueue(&state, &msg, &addr, recv_time) < 0) {
                     fprintf(stderr, "Failed to enqueue message from %s:%d\n",

@@ -83,12 +83,6 @@ static uint8_t *read_payload_file(const char *filename, size_t *payload_len) {
     return payload;
 }
 
-static uint64_t get_time_us(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
-}
-
 int main(int argc, char *argv[]) {
     srand(time(NULL)); /* Seed rand() for compatibility */
     if (argc != 4) {
@@ -96,11 +90,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const char *from_node_hash = fnv1a_32(argv[1], strlen(argv[1]));
-    const char *to_node_hash = fnv1a_32(argv[2], strlen(argv[2]));
+    uint32_t from_node_hash = fnv1a_32(argv[1], strlen(argv[1]));
+    uint32_t to_node_hash = fnv1a_32(argv[2], strlen(argv[2]));
 
-    const char from_node_name[16];
-    const char to_node_name[16];
+    char from_node_name[16];
+    char to_node_name[16];
 
     snprintf(from_node_name, sizeof(from_node_name), "%08x", from_node_hash);
     snprintf(to_node_name, sizeof(to_node_name), "%08x", to_node_hash);
@@ -147,7 +141,7 @@ int main(int argc, char *argv[]) {
         free(payload);
         return 1;
     }
-    
+
     memcpy(&msg.seq_no, seq_no, sizeof(uint32_t));
     msg.timestamp = get_time_us();
     fprintf(stderr, "Debug: Set seq_no=%u, timestamp=%lu\n", msg.seq_no, msg.timestamp);
@@ -155,7 +149,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Debug: Setting message data\n");
     skynet_set_data(&msg, payload, payload_len, aes_key, hmac_key);
     free(payload);
-    
+
     if (msg.payload_len == 0) {
         fprintf(stderr, "Failed to set message data\n");
         return 1;
@@ -173,6 +167,9 @@ int main(int argc, char *argv[]) {
     char pub_path[256];
     snprintf(pub_path, sizeof(pub_path), "%s.sky", payload_file_name);
     FILE *pub_file = fopen(pub_path, "wb");
+
+    hex_dump("encrypt", &msg, 200);
+
     if (!pub_file || fwrite(buffer, 1, len, pub_file) != len) {
         fprintf(stderr, "Failed to write encoded message to %s.\n", pub_path);
         if (pub_file) fclose(pub_file);

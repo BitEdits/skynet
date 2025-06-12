@@ -88,11 +88,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const char *from_node_hash = fnv1a_32(argv[1], strlen(argv[1]));
-    const char *to_node_hash = fnv1a_32(argv[2], strlen(argv[2]));
+    uint32_t from_node_hash = fnv1a_32(argv[1], strlen(argv[1]));
+    uint32_t to_node_hash = fnv1a_32(argv[2], strlen(argv[2]));
 
-    const char from_node_name[16];
-    const char to_node_name[16];
+    char from_node_name[16];
+    char to_node_name[16];
 
     snprintf(from_node_name, sizeof(from_node_name), "%08x", from_node_hash);
     snprintf(to_node_name, sizeof(to_node_name), "%08x", to_node_hash);
@@ -104,6 +104,7 @@ int main(int argc, char *argv[]) {
 
     EVP_PKEY *priv_key = load_ec_key(1, to_node_name, 1);
     EVP_PKEY *peer_pub_key = load_ec_key(0, from_node_name, 0);
+
     if (!priv_key || !peer_pub_key) {
         EVP_PKEY_free(priv_key);
         EVP_PKEY_free(peer_pub_key);
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]) {
         EVP_PKEY_free(peer_pub_key);
         return 1;
     }
-    
+
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
 
@@ -127,7 +128,7 @@ int main(int argc, char *argv[]) {
     }
 
     SkyNetMessage msg;
-    fprintf(stderr, "Debug: Deserializing message\n");
+    fprintf(stderr, "Debug: Deserializing message with size %d\n", file_len);
     if (skynet_deserialize(&msg, encrypted_data, file_len) < 0) {
         fprintf(stderr, "Failed to deserialize message\n");
         free(encrypted_data);
@@ -146,6 +147,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Failed to decrypt payload\n");
         return 1;
     }
+
+    hex_dump("decrypt", &msg, 200);
 
     char out_path[256];
     snprintf(out_path, sizeof(out_path), "%s.dec", encrypted_file_name);

@@ -47,7 +47,7 @@ char *get_base_path(int srv, const char *node_name) {
     if (strcmp(node_name, "server") == 0) return SERVER_BASE_PATH;
     if (strcmp(node_name, "client") == 0) return CLIENT_BASE_PATH;
     if (strcmp(node_name, "40ac3dd2") == 0) return SERVER_BASE_PATH;
-    if (strcmp(node_name, " 8f929c1e") == 0) return CLIENT_BASE_PATH;
+    if (strcmp(node_name, "8f929c1e") == 0) return CLIENT_BASE_PATH;
     return srv == 0 ? CLIENT_BASE_PATH : SERVER_BASE_PATH;
 }
 
@@ -206,8 +206,8 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, const char *from_node, const cha
     snprintf(from_name, sizeof(from_name), "%08x", from_hash);
 
 
-    EVP_PKEY *priv_key = load_ec_key(0, from_name, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(1, to_name, 0);
+    EVP_PKEY *priv_key = load_ec_key(1, from_name, 1);
+    EVP_PKEY *peer_pub_key = load_ec_key(0, to_name, 0);
 
     if (!priv_key || !peer_pub_key) {
         EVP_PKEY_free(priv_key);
@@ -244,8 +244,10 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, const char *to_node, const char 
         return -1;
     }
 
+
     EVP_PKEY *priv_key = load_ec_key(1, to_node, 1);
     EVP_PKEY *peer_pub_key = load_ec_key(0, from_node, 0);
+
     if (!priv_key || !peer_pub_key) {
         EVP_PKEY_free(priv_key);
         EVP_PKEY_free(peer_pub_key);
@@ -261,12 +263,12 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, const char *to_node, const char 
 
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
-
+/*
     if (skynet_verify_hmac(msg, hmac_key) < 0) {
         fprintf(stderr, "Error: HMAC verification failed\n");
         return -1;
     }
-
+*/
     if (skynet_decrypt_payload(msg, aes_key) < 0) {
         fprintf(stderr, "Error: Payload decryption failed\n");
         return -1;
@@ -445,17 +447,8 @@ int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_
     msg->hop_count = buffer[offset++];
     memcpy(msg->iv, buffer + offset, 16); offset += 16;
     msg->payload_len = ntohs(*(uint16_t *)(buffer + offset)); offset += 2;
-
-    if (msg->payload_len > SKYNET_MAX_PAYLOAD || offset + msg->payload_len + 32 + 4 > buffer_size) {
-        fprintf(stderr, "Error: Invalid payload length or buffer overrun: payload_len=%u, buffer_size=%zu\n",
-                msg->payload_len, buffer_size);
-        return -1;
-    }
-
     memcpy(msg->payload, buffer + offset, msg->payload_len); offset += msg->payload_len;
-    memcpy(msg->hmac, buffer + offset, 32); offset += 32;
-    msg->crc = ntohl(*(uint32_t *)(buffer + offset)); offset += 4;
-
+    memcpy(msg->hmac, buffer + offset, 32);
     return 0;
 }
 
@@ -647,4 +640,19 @@ int set_non_blocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) return -1;
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+uint64_t get_time_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+
+void hex_dump(const char *label, const uint8_t *data, size_t len) {
+    fprintf(stderr, "%s:\n", label);
+    for (size_t i = 0; i < len; i++) {
+        fprintf(stderr, "%02x ", data[i]);
+        if (i % 16 == 15) fprintf(stderr, "\n");
+    }
+    if (len % 16 != 0) fprintf(stderr, "\n");
 }

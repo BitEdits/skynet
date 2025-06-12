@@ -134,6 +134,7 @@ int main(int argc, char *argv[]) {
     SkyNetMessage msg;
     skynet_init(&msg, SKYNET_MSG_KEY_EXCHANGE, node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
     msg.seq_no = seq_no++;
+    msg.timestamp = get_time_us();
     BIO *bio = BIO_new(BIO_s_mem());
     if (!bio || !PEM_write_bio_PUBKEY(bio, ec_key)) {
         fprintf(stderr, "Failed to serialize public key\n");
@@ -159,6 +160,10 @@ int main(int argc, char *argv[]) {
     skynet_print(&msg);
     int len = skynet_serialize(&msg, buffer, MAX_BUFFER);
     if (len > 0) {
+
+        printf("SERIALIZED LEN: %d\n", len);
+        hex_dump("SKY HEX DUMP", &msg, len);
+
         if (sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&npg_addrs[0], sizeof(npg_addrs[0])) < 0) {
             perror("Send key exchange failed");
         } else {
