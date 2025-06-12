@@ -19,26 +19,6 @@
 #define BASE_PATH_SERVER "~/.skynet/ecc/secp384r1/"
 #define BASE_PATH_CLIENT "~/.skynet_client/ecc/secp384r1/"
 
-static void print_openssl_error(void) {
-    unsigned long err = ERR_get_error();
-    char err_str[256];
-    ERR_error_string_n(err, err_str, sizeof(err_str));
-    fprintf(stderr, "OpenSSL error: %s\n", err_str);
-}
-
-static char *expand_home(const char *path) {
-    const char *home = getenv("HOME");
-    if (!home) {
-        fprintf(stderr, "HOME environment variable not set\n");
-        return NULL;
-    }
-    size_t len = strlen(home) + strlen(path) + 1;
-    char *expanded = malloc(len);
-    if (!expanded) return NULL;
-    snprintf(expanded, len, "%s%s", home, path + 1);
-    return expanded;
-}
-
 static int create_dir(const char *path) {
     char *tmp = strdup(path);
     if (!tmp) return -1;
@@ -78,7 +58,6 @@ static int generate_keys(const char *node_name, int is_client) {
     char aes_path[256], hmac_path[256], id_path[256], priv_path[256], pub_path[256];
     snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, hash_str);
     snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, hash_str);
-    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, hash_str);
     snprintf(priv_path, sizeof(priv_path), "%s/%s.ec_priv", dir_path, hash_str);
     snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, hash_str);
 
@@ -116,17 +95,6 @@ static int generate_keys(const char *node_name, int is_client) {
     }
     fclose(hmac_file);
 
-    // Generate node ID
-    uint32_t node_id = (uint32_t)rand();
-    FILE *id_file = fopen(id_path, "wb");
-    if (!id_file || fwrite(&node_id, 1, sizeof(node_id), id_file) != sizeof(node_id)) {
-        fprintf(stderr, "Failed to write node ID to %s: %s\n", id_path, strerror(errno));
-        if (id_file) fclose(id_file);
-        free(dir_path);
-        return -1;
-    }
-    fclose(id_file);
-
     // Generate secp384r1 key pair
     EC_KEY *ec_key = EC_KEY_new_by_curve_name(NID_secp384r1);
     if (!ec_key || !EC_KEY_generate_key(ec_key)) {
@@ -162,7 +130,7 @@ static int generate_keys(const char *node_name, int is_client) {
     fclose(pub_file);
 
     EC_KEY_free(ec_key);
-    printf("Generated keys for node %s (hash: %s) in %s (ID: %u)\n", node_name, hash_str, dir_path, node_id);
+    printf("Generated keys for node %s (hash: %s) in %s (ID: %u)\n", node_name, hash_str, dir_path);
     free(dir_path);
     return 0;
 }
