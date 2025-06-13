@@ -1,0 +1,91 @@
+VMF Messaging
+=============
+
+US Protocol Stack:
+
+* MIL-STD-6016          LINK16
+* MIL-STD-6017          VMF Message Body
+* MIL-STD-2045-47001    Application Header
+* MIL-STD-188-220       Lower Layer Protocols
+
+VMF Message Format
+------------------
+
+1. Message Number (Kn.m)
+2. Index No (Nat)
+3. DFI/DUIs (Data Element Dictionary)
+4. Category (M,X,O)
+5. Group Code (G1,G2,G1/G2,...)
+6. Repear Code (R1,R2,R1/R2,...)
+7. Resolution (URN)
+
+VMF Message Numbers
+-------------------
+
+K00.Y  Network Control Messages
+K01.Y  General Information Exchange Messages
+K02.Y  Fire Support Operation Messages
+K03.Y  Air Operation Messages
+K04.Y  Intelligence Operations / Imagery
+K05.Y  Land Combat Operations Messages
+K06.Y  Maritime Operations
+K07.Y  Combat Service Support
+K08.Y  Special Operations
+K09.Y  Joint Task Force (JTF) Operations Control
+K10.Y  Air Defence / Air Space Control
+
+VMF Messages Taxonomy
+---------------------
+
+Here is non full list of VMF messages.
+
+K01.1  Free Text | To provide information that does not fall into a structured format.
+K01.2  Unit Reference Query/Response | To request or distribute the data associated with a unit reference number
+
+K02.1  Check Fire
+K02.4  Call for Fire
+K02.14 Message to Observer
+K02.15 Fire Support Coordination
+K02.16 End of Mission and Surveillance
+K02.22 Subsequent Adjust
+K02.25 End of Mission Notification
+K02.27 Close Air Support Request (To request immediate or preplanned close air support)
+K02.28 Close Air Support Mission Battle Damage Assessment (CASBDA) Report (To report battle damage assessment after the complection of CAS mission)
+K02.31 Mission Request Rejection (To inform a requestor that a planned or immediate CAS mission(s) request is rejected).
+K02.32 Close Air Support Request Acceptance (To inform command and control agencies that a close air support mission request has been accepted for a planned or immediate mission)
+K02.33 Close Air Support Aircrew Briefing (To provide aircrews all essential information for a close air support mission)
+K02.34 Aircraft On-Station (For the pilot or flight leader to notify the control agency that he and his fight have arrived at the prescribed control station)
+K02.35 Aircraft Depart Initial Point (For the pilot or flight leader to notify the control agency that his/her flight is departing the initial point to complete the assigned air support mission)
+K02.57 Aircraft Attack Position and Target Designation (To provide aircraft location, target location and aircraft system status to the FACs)
+K02.58 CAS Aircraft Final Attack Control (To provide the ability to conduct final attack (terminal) control and the CAS Aircraft to respond the an abort code mismatch)
+K02.59 Request for K02.57 Aircraft Attack Position and Target Designation (To provide the FAC with means to schedule, start, and stop CAS aircraft attack position and target designation reporing message)
+
+K03.6  MAYDAY
+
+K04.1  Observation Report
+K04.13 Basic Weather Report
+
+K05.1  Position Report
+K05.2  NBC 1 Report
+K05.13 Threat Warning Message
+K05.14 Situation Report
+K05.15 Field Orders
+K05.17 Overlay Message
+K05.19 Chemical, Biological, Radiological, Nuclear (CBRN) 
+K05.19 Aircraft/ Antiaircraft 
+K05.19 Artillery
+K05.19 Chemlight
+K05.19 Dismounted Personnel
+K05.19 Spot Report
+K05.19 Other - Entity Combat Status
+K05.19 Other - Medical Evacuation (MEDEVAC)
+
+K07.1  MEDEVAC
+K07.3  Logistics Report
+K07.4  Personnel Report
+K07.10 Emergency Resupply Request
+
+Bibliography
+------------
+
+[1]. https://www.marines.mil/portals/1/publications/mco%203093.3.pdf?utm_source=chatgpt.com
