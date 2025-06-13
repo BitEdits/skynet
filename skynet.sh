@@ -1,5 +1,3 @@
-#!/bin/sh
-
 rm -f skynet skynet_client skynet_decrypt skynet_encrypt skynet_keygen
 
 gcc -o skynet          skynet.c         skynet_proto.c -lcrypto
