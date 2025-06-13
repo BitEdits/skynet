@@ -65,11 +65,9 @@ Subscriptions
 
 * Infantry: NPGs 1, 29 (control, chat).
 * Drone: NPGs 1, 6, 7, 100, 101 (control, PLI, surveillance, C2, alerts).
-* Aircraft: NPGs 1, 6, 7, 100, 101, 103 (control, PLI, surveillance, C2, alerts, inter-agent).
-* Warship: NPGs 1, 7, 29, 102, 103 (control, surveillance, chat, logistics, inter-agent).
-* Platform: NPGs 1, 7, 29, 102 (control, surveillance, chat, logistics).
-* Train: NPGs 1, 6, 100, 102, 103 (control, PLI, C2, logistics, inter-agent).
-* Wheels: NPGs 1, 6, 29, 100, 102, 103 (control, PLI, chat, C2, logistics, inter-agent).
+* Air: NPGs 1, 6, 7, 100, 101, 103 (control, PLI, surveillance, C2, alerts, inter-agent).
+* Sea: NPGs 1, 7, 29, 102, 103 (control, surveillance, chat, logistics, inter-agent).
+* Ground: NPGs 1, 7, 29, 102 (control, surveillance, chat, logistics).
 * Relay: NPGs 1, 6, 101 (control, PLI, alerts).
 * Controller: NPGs 1, 6, 100, 101 (control, PLI, C2, alerts).
 
