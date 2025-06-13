@@ -13,6 +13,9 @@
 #include <openssl/params.h>
 #include "skynet.h"
 
+#define NODE_NAME_LEN 16
+
+// Helper to print OpenSSL errors
 void print_openssl_error(void) {
     unsigned long err = ERR_get_error();
     char err_str[256];
@@ -20,6 +23,7 @@ void print_openssl_error(void) {
     fprintf(stderr, "OpenSSL error: %s\n", err_str);
 }
 
+// Expand home directory path
 char *expand_home(const char *path) {
     const char *home = getenv("HOME");
     if (!home) {
@@ -36,13 +40,14 @@ char *expand_home(const char *path) {
     return expanded;
 }
 
+// Get base path for server or client
+char *base_path(int srv) {
+    return srv == 0 ? CLIENT_BASE_PATH : SERVER_BASE_PATH;
+}
 
-char *base_path(int srv) { return srv == 0 ? CLIENT_BASE_PATH : SERVER_BASE_PATH; }
-
+// Build key file path
 char *build_key_path(int srv, const char *node_name, const char *suffix) {
-
     const char *basepath = base_path(srv);
-
     if (!basepath) {
         fprintf(stderr, "Invalid node name: %s (must be 'server' or 'client')\n", node_name);
         return NULL;
@@ -57,12 +62,12 @@ char *build_key_path(int srv, const char *node_name, const char *suffix) {
         free(dir_path);
         return NULL;
     }
-
     snprintf(path, path_len, "%s%s%s", dir_path, node_name, suffix);
     free(dir_path);
     return path;
 }
 
+// Load EC key (private or public)
 EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private) {
     char *key_path = build_key_path(srv, node_name, is_private ? ".ec_priv" : ".ec_pub");
     if (!key_path) return NULL;
@@ -81,13 +86,29 @@ EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private) {
     fclose(key_file);
     free(key_path);
 
-    if (!key) {
-        print_openssl_error();
-        return NULL;
-    }
+    if (!key) print_openssl_error();
     return key;
 }
 
+// Helper to prepare node names
+void prepare_node_names(uint32_t from_node, uint32_t to_node, char *from_name, char *to_name) {
+    snprintf(to_name, NODE_NAME_LEN, "%08x", to_node);
+    snprintf(from_name, NODE_NAME_LEN, "%08x", from_node);
+}
+
+// Helper to load encryption/decryption keys
+int load_keys(int srv, const char *from_name, const char *to_name, EVP_PKEY **priv_key, EVP_PKEY **peer_pub_key) {
+    *priv_key = load_ec_key(srv, from_name, 1);
+    *peer_pub_key = load_ec_key(srv ^ 1, to_name, 0);
+    if (!*priv_key || !*peer_pub_key) {
+        EVP_PKEY_free(*priv_key);
+        EVP_PKEY_free(*peer_pub_key);
+        return -1;
+    }
+    return 0;
+}
+
+// Derive shared AES and HMAC keys
 int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key) {
     EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(priv_key, NULL);
     if (!ctx || EVP_PKEY_derive_init(ctx) <= 0) {
@@ -132,7 +153,6 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len),
         OSSL_PARAM_construct_end()
     };
-
     if (EVP_KDF_derive(kdf_ctx, aes_key, 32, aes_params) <= 0) {
         print_openssl_error();
         EVP_KDF_CTX_free(kdf_ctx);
@@ -147,7 +167,6 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         OSSL_PARAM_construct_octet_string("info", (unsigned char *)"HMAC", 4),
         OSSL_PARAM_construct_end()
     };
-
     if (EVP_KDF_derive(kdf_ctx, hmac_key, 32, hmac_params) <= 0) {
         print_openssl_error();
         EVP_KDF_CTX_free(kdf_ctx);
@@ -162,8 +181,42 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
     return 0;
 }
 
-int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len) {
+// Helper to prepare HMAC data buffer
+uint8_t *prepare_hmac_data(const SkyNetMessage *msg, uint32_t *data_len) {
+    *data_len = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len;
+    if (*data_len > SKYNET_MAX_PAYLOAD + 32) {
+        fprintf(stderr, "Error: HMAC data length too large: %u\n", *data_len);
+        return NULL;
+    }
 
+    uint8_t *hmac_data = malloc(*data_len);
+    if (!hmac_data) {
+        fprintf(stderr, "Error: Memory allocation failed for HMAC\n");
+        return NULL;
+    }
+
+    size_t offset = 0;
+    hmac_data[offset++] = msg->version;
+    hmac_data[offset++] = msg->type;
+    *(uint32_t *)(hmac_data + offset) = htonl(msg->npg_id); offset += 4;
+    *(uint32_t *)(hmac_data + offset) = htonl(msg->node_id); offset += 4;
+    *(uint32_t *)(hmac_data + offset) = htonl(msg->seq_no); offset += 4;
+    *(uint64_t *)(hmac_data + offset) = htobe64(msg->timestamp); offset += 8;
+    hmac_data[offset++] = msg->qos;
+    hmac_data[offset++] = msg->hop_count;
+    memcpy(hmac_data + offset, msg->iv, 16); offset += 16;
+    *(uint16_t *)(hmac_data + offset) = htons(msg->payload_len); offset += 2;
+    memcpy(hmac_data + offset, msg->payload, msg->payload_len); offset += msg->payload_len;
+
+    if (offset != *data_len) {
+        fprintf(stderr, "Error: HMAC data length mismatch: %zu != %u\n", offset, *data_len);
+        free(hmac_data);
+        return NULL;
+    }
+    return hmac_data;
+}
+
+int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len) {
     fprintf(stderr, "Debug: Starting encryption on %s: from=%x, to=%x, size=%x\n", srv == 0 ? "client" : "server", from_node, to_node, data_len);
 
     if (data_len > SKYNET_MAX_PAYLOAD - 16) {
@@ -171,19 +224,11 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
         return -1;
     }
 
-    char to_name[16];
-    char from_name[16];
-    snprintf(to_name, sizeof(to_name), "%08x", to_node);
-    snprintf(from_name, sizeof(from_name), "%08x", from_node);
+    char from_name[NODE_NAME_LEN], to_name[NODE_NAME_LEN];
+    prepare_node_names(from_node, to_node, from_name, to_name);
 
-    EVP_PKEY *priv_key = load_ec_key(srv, from_name, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(srv ^ 1, to_name, 0);
-
-    if (!priv_key || !peer_pub_key) {
-        EVP_PKEY_free(priv_key);
-        EVP_PKEY_free(peer_pub_key);
-        return -1;
-    }
+    EVP_PKEY *priv_key = NULL, *peer_pub_key = NULL;
+    if (load_keys(srv, from_name, to_name, &priv_key, &peer_pub_key) < 0) return -1;
 
     uint8_t aes_key[32], hmac_key[32];
     if (derive_shared_key(priv_key, peer_pub_key, aes_key, hmac_key) < 0) {
@@ -201,13 +246,11 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
         return -1;
     }
 
-    fprintf(stderr, "Debug: Enryption done OK\n");
-
+    fprintf(stderr, "Debug: Encryption done OK\n");
     return 0;
 }
 
 int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_node) {
-
     fprintf(stderr, "Debug: Starting decryption on %s: from=%x, to=%x, size=%x\n", srv == 0 ? "client" : "server", from_node, to_node, msg->payload_len);
 
     if (!msg || !to_node || !from_node) {
@@ -215,19 +258,11 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
         return -1;
     }
 
-    char to_name[16];
-    char from_name[16];
-    snprintf(to_name, sizeof(to_name), "%08x", to_node);
-    snprintf(from_name, sizeof(from_name), "%08x", from_node);
+    char from_name[NODE_NAME_LEN], to_name[NODE_NAME_LEN];
+    prepare_node_names(from_node, to_node, from_name, to_name);
 
-    EVP_PKEY *priv_key = load_ec_key(srv, to_name, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(srv ^ 1, from_name, 0);
-
-    if (!priv_key || !peer_pub_key) {
-        EVP_PKEY_free(priv_key);
-        EVP_PKEY_free(peer_pub_key);
-        return -1;
-    }
+    EVP_PKEY *priv_key = NULL, *peer_pub_key = NULL;
+    if (load_keys(srv, to_name, from_name, &priv_key, &peer_pub_key) < 0) return -1;
 
     uint8_t aes_key[32], hmac_key[32];
     if (derive_shared_key(priv_key, peer_pub_key, aes_key, hmac_key) < 0) {
@@ -250,7 +285,6 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
     }
 
     fprintf(stderr, "Debug: Decryption done OK\n");
-
     return 0;
 }
 
@@ -262,7 +296,7 @@ void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, u
     msg->node_id = node_id;
     msg->qos = qos;
     msg->hop_count = 0;
-    msg->timestamp = 0; /* Set by caller */
+    msg->timestamp = 0; 
     if (RAND_bytes(msg->iv, 16) != 1) {
         fprintf(stderr, "Error: Failed to generate random IV\n");
         print_openssl_error();
@@ -326,36 +360,9 @@ void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_leng
     msg->payload_len += 16;
     EVP_CIPHER_CTX_free(ctx);
 
-    uint32_t data_len = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len;
-    if (data_len > SKYNET_MAX_PAYLOAD + 32) {
-        fprintf(stderr, "Error: HMAC data length too large: %u\n", data_len);
-        return;
-    }
-
-    uint8_t *hmac_data = malloc(data_len);
-    if (!hmac_data) {
-        fprintf(stderr, "Error: Memory allocation failed for HMAC\n");
-        return;
-    }
-
-    size_t offset = 0;
-    hmac_data[offset++] = msg->version;
-    hmac_data[offset++] = msg->type;
-    *(uint32_t *)(hmac_data + offset) = htonl(msg->npg_id); offset += 4;
-    *(uint32_t *)(hmac_data + offset) = htonl(msg->node_id); offset += 4;
-    *(uint32_t *)(hmac_data + offset) = htonl(msg->seq_no); offset += 4;
-    *(uint64_t *)(hmac_data + offset) = htobe64(msg->timestamp); offset += 8;
-    hmac_data[offset++] = msg->qos;
-    hmac_data[offset++] = msg->hop_count;
-    memcpy(hmac_data + offset, msg->iv, 16); offset += 16;
-    *(uint16_t *)(hmac_data + offset) = htons(msg->payload_len); offset += 2;
-    memcpy(hmac_data + offset, msg->payload, msg->payload_len); offset += msg->payload_len;
-
-    if (offset != data_len) {
-        fprintf(stderr, "Error: HMAC data length mismatch: %zu != %u\n", offset, data_len);
-        free(hmac_data);
-        return;
-    }
+    uint32_t data_len;
+    uint8_t *hmac_data = prepare_hmac_data(msg, &data_len);
+    if (!hmac_data) return;
 
     unsigned int hmac_len;
     if (!HMAC(EVP_sha256(), hmac_key, 32, hmac_data, data_len, msg->hmac, &hmac_len) || hmac_len != 32) {
@@ -377,7 +384,7 @@ int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_si
         return -1;
     }
 
-    size_t required_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len + 32 + 4;
+    size_t required_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len + 32;
     if (buffer_size < required_size) {
         fprintf(stderr, "Error: Buffer too small: %zu < %zu\n", buffer_size, required_size);
         return -1;
@@ -406,7 +413,7 @@ int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_
         return -1;
     }
 
-    size_t min_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + 32 + 4;
+    size_t min_size = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + 32;
     if (buffer_size < min_size) {
         fprintf(stderr, "Error: Buffer too small for deserialization: %zu < %zu\n", buffer_size, min_size);
         return -1;
@@ -442,36 +449,9 @@ int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key) {
     }
 
     unsigned char computed_hmac[32];
-    uint32_t data_len = 1 + 1 + 4 + 4 + 4 + 8 + 1 + 1 + 16 + 2 + msg->payload_len;
-    if (data_len > SKYNET_MAX_PAYLOAD + 32) {
-        fprintf(stderr, "Error: HMAC data length too large: %u\n", data_len);
-        return -1;
-    }
-
-    uint8_t *data = malloc(data_len);
-    if (!data) {
-        fprintf(stderr, "Error: Memory allocation failed for HMAC verification\n");
-        return -1;
-    }
-
-    size_t offset = 0;
-    data[offset++] = msg->version;
-    data[offset++] = msg->type;
-    *(uint32_t *)(data + offset) = htonl(msg->npg_id); offset += 4;
-    *(uint32_t *)(data + offset) = htonl(msg->node_id); offset += 4;
-    *(uint32_t *)(data + offset) = htonl(msg->seq_no); offset += 4;
-    *(uint64_t *)(data + offset) = htobe64(msg->timestamp); offset += 8;
-    data[offset++] = msg->qos;
-    data[offset++] = msg->hop_count;
-    memcpy(data + offset, msg->iv, 16); offset += 16;
-    *(uint16_t *)(data + offset) = htons(msg->payload_len); offset += 2;
-    memcpy(data + offset, msg->payload, msg->payload_len); offset += msg->payload_len;
-
-    if (offset != data_len) {
-        fprintf(stderr, "Error: HMAC data length mismatch: %zu != %u\n", offset, data_len);
-        free(data);
-        return -1;
-    }
+    uint32_t data_len;
+    uint8_t *data = prepare_hmac_data(msg, &data_len);
+    if (!data) return -1;
 
     unsigned int hmac_len;
     if (!HMAC(EVP_sha256(), hmac_key, 32, data, data_len, computed_hmac, &hmac_len) || hmac_len != 32) {
@@ -556,7 +536,6 @@ uint32_t fnv1a_32(const void *data, size_t len) {
     }
     return hash;
 }
-
 
 int save_public_key(int srv, const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
     char *dir_path = expand_home(base_path(srv));
