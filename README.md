@@ -1,7 +1,7 @@
 Skynet
 ======
 
-Skynet is LINK16/TSM/SRW/MQTT inspired tactical protocol for military appliances.
+Skynet is a LINK16/TSM/SRW/MQTT inspired tactical protocol for military appliances.
 
 Properties
 ----------
