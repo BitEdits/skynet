@@ -14,7 +14,7 @@ Properties
 * Multicast Topics
 * UDP interface
 * Only POSIX/OpenSSL dependencies
-& 64KB L1 footprint
+* 64KB L1 footprint
 
 Install
 -------
