@@ -374,8 +374,6 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
             char from[16];
             snprintf(from, 16, "%08x", 0x40ac3dd2);
             snprintf(to, 16, "%08x", msg->node_id);
-            printf("from: %s\n", from);
-            printf("to: %s\n", to);
             if (skynet_encrypt(1, &response, 0x40ac3dd2, msg->node_id, "OK", 2) < 0) {
                 fprintf(stderr, "Failed to encrypt key exchange response\n");
                 return;
