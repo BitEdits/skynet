@@ -34,7 +34,7 @@ Generated keys for node npg_coord (hash: e46c0c22) in /home/tonpa/.skynet/ecc/se
 Generated keys for node server (hash: 40ac3dd2) in /home/tonpa/.skynet/ecc/secp384r1/
 Generated keys for node client (hash: 8f929c1e) in /home/tonpa/.skynet_client/ecc/secp384r1/
 $ cp /home/tonpa/.skynet/ecc/secp384r1/*.ec_pub /home/tonpa/.skynet_client/ecc/secp384r1/
-$ ./slynet server &
+$ ./skynet server &
 $ ./skynet_client client
 ```
 
