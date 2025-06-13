@@ -88,18 +88,18 @@ typedef enum {
 } NodeRole;
 
 typedef struct {
-    uint8_t version; // 1
-    uint8_t type; // 2
-    uint32_t npg_id; // 3
-    uint32_t node_id; // 7
-    uint32_t seq_no; // 11
-    uint64_t timestamp; // 15
-    uint8_t qos; // 23
-    uint8_t hop_count; // 24
-    uint8_t iv[16]; // 25
-    uint16_t payload_len; // 27
-    uint8_t payload[MAX_BUFFER];
-    uint8_t hmac[32];
+    uint8_t version;        // 1 byte
+    uint8_t type;           // 1 byte
+    uint32_t npg_id;        // 4 bytes
+    uint32_t node_id;       // 4 bytes
+    uint32_t seq_no;        // 4 bytes
+    uint64_t timestamp;     // 8 bytes
+    uint8_t qos;            // 1 byte
+    uint8_t hop_count;      // 1 byte
+    uint8_t iv[16];         // 16 bytes
+    uint8_t hmac[32];       // 32 bytes
+    uint16_t payload_len;   // 2 bytes
+    uint8_t payload[MAX_BUFFER]; // Variable
 } SkyNetMessage;
 
 #define FNV_OFFSET_BASIS_32 2166136261U
