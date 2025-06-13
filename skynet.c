@@ -155,13 +155,13 @@ static void server_init(ServerState *state, const char *node_name) {
     strncpy(state->server_name, node_name, MAX_NODE_NAME - 1);
     state->server_name[MAX_NODE_NAME - 1] = '\0';
 
-    if (load_keys(1, node_name, state->aes_key, state->hmac_key, &state->node_id, &state->ec_key)) {
-        fprintf(stderr, "Failed to load keys\n");
+    if (load_private(1, node_name, &state->ec_key)) {
+        fprintf(stderr, "Failed to load server private key\n");
         exit(1);
     }
 
-    const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
-                            "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
+    const char *topics[] = { "npg_control", "npg_pli", "npg_surveillance",
+                             "npg_chat", "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
 
     for (int i = 0; i < 8; i++) {
         uint32_t topic_hash = fnv1a_32(topics[i], strlen(topics[i]));

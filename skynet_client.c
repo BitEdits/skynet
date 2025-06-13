@@ -36,33 +36,29 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    uint8_t aes_key[32], hmac_key[32];
-    uint32_t node_id2;
-    uint32_t node_id = fnv1a_32(argname, strlen(argname));
     char node_name[16];
+    uint32_t node_id = fnv1a_32(argname, strlen(argname));
     snprintf(node_name, sizeof(node_name), "%08x", node_id);
 
-    printf("Node name: %s\n", node_name);
+    printf("Client: %s (hash: %x)\n", argname, node_id);
 
     EVP_PKEY *ec_key = NULL;
-    if (load_keys(0, node_name, aes_key, hmac_key, &node_id2, &ec_key) < 0) {
+    if (load_private(0, node_name, &ec_key) < 0) {
+        fprintf(stderr, "Failed to load client private key\n");
         return 1;
     }
 
-    printf("Node id: %x\n", node_id);
-
-    // Load topic public keys
-    const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
-                            "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
+    const char *topics[] = { "npg_control", "npg_pli", "npg_surveillance", "npg_chat",
+                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
 
     EVP_PKEY *topic_pub_keys[8] = {0};
     for (int i = 0; i < 8; i++) {
 
         uint32_t topic_hash = fnv1a_32(topics[i], strlen(topics[i]));
-        char node_name[16];
-        snprintf(node_name, sizeof(node_name), "%08x", topic_hash);
+        char topic_name[16];
+        snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
 
-        topic_pub_keys[i] = load_ec_key(0, node_name, 0);
+        topic_pub_keys[i] = load_ec_key(0, topic_name, 0);
         if (!topic_pub_keys[i]) {
             fprintf(stderr, "Failed to load topic public key %s\n", topics[i]);
             EVP_PKEY_free(ec_key);

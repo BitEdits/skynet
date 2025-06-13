@@ -543,12 +543,9 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     return 0;
 }
 
-// load_private
-int load_keys(int srv, const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key) {
-
+int load_private(int srv, const char *node_name, EVP_PKEY **ec_key) {
     *ec_key = load_ec_key(srv, node_name, 1);
     if (!*ec_key) return -1;
-
     return 0;
 }
 
