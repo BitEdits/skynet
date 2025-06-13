@@ -17,3 +17,7 @@ gcc -o skynet_keygen   skynet_keygen.c  skynet_proto.c -lcrypto
 ./skynet_keygen server           --server
 ./skynet_keygen client           --client
 
+./skynet_encrypt client server 1
+./skynet_decrypt client server 1.sky
+
+
