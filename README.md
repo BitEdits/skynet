@@ -169,4 +169,3 @@ Author
 ------
 
 * Namdak Tonpa
-* Moneta Rocco
