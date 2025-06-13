@@ -1,4 +1,5 @@
 // gcc -o skynet_encrypt skynet_encrypt.c skynet_proto.c -lcrypto
+// skynet_encrypt client server 1
 
 #include <stdio.h>
 #include <stdlib.h>

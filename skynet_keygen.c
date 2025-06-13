@@ -1,4 +1,6 @@
 // gcc -o skynet_keygen skynet_keygen.c skynet_proto.c -lcrypto
+// skynet_keygen client --client
+// skynet_keygen server --server
 
 #include <stdio.h>
 #include <stdlib.h>

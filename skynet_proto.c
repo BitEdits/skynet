@@ -1,5 +1,3 @@
-// gcc -c skynet_proto.c -o skynet_proto.o -lcrypto
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

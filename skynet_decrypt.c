@@ -1,4 +1,5 @@
 // gcc -o skynet_decrypt skynet_decrypt.c skynet_proto.c -lcrypto
+// skynet_decrypt client server 1.sky
 
 #include <stdio.h>
 #include <stdlib.h>

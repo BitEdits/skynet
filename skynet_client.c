@@ -1,4 +1,5 @@
 // gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
+// skynet_client client
 
 #include <stdio.h>
 #include <stdlib.h>
