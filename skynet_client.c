@@ -19,13 +19,10 @@
 #include "skynet.h"
 
 #define PORT 6566
-#define MAX_BUFFER 1590
 #define VEHICLE_TYPE VEHICLE_F_16_FALCON
 #define NODE_ROLE NODE_ROLE_AIR_VEHICLE
 #define TIME_SLOT_INTERVAL_US 1000
 #define MESSAGE_LIMIT 10
-#define MAX_NODE_NAME 64
-#define BASE_PATH "~/.skynet_client/ecc/secp384r1/"
 #define SERVER_NAME "server"
 
 int main(int argc, char *argv[]) {

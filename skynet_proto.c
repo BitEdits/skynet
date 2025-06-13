@@ -15,11 +15,6 @@
 #include <openssl/params.h>
 #include "skynet.h"
 
-#define MAX_NODE_NAME 64
-#define SERVER_BASE_PATH "~/.skynet/ecc/secp384r1/"
-#define CLIENT_BASE_PATH "~/.skynet_client/ecc/secp384r1/"
-#define HASH_STR_LEN 16
-
 void print_openssl_error(void) {
     unsigned long err = ERR_get_error();
     char err_str[256];
@@ -403,7 +398,6 @@ int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_si
     *(uint16_t *)(buffer + offset) = htons(msg->payload_len); offset += 2;
     memcpy(buffer + offset, msg->payload, msg->payload_len); offset += msg->payload_len;
     memcpy(buffer + offset, msg->hmac, 32); offset += 32;
-    *(uint32_t *)(buffer + offset) = htonl(msg->crc); offset += 4;
 
     return (int)offset;
 }

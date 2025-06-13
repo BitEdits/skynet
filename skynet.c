@@ -28,14 +28,12 @@
 
 #define PORT 6566
 #define MAX_NODES 2000
-#define MAX_BUFFER 1490
 #define TIME_SLOT_INTERVAL_US 1000
 #define THREAD_COUNT 4
 #define QUEUE_SIZE 1024
 #define MAX_SEQUENCES 64
 #define MAX_EVENTS 32
 #define NEIGHBOR_TIMEOUT_US 5000000
-#define MAX_NODE_NAME 64
 
 typedef struct {
     struct sockaddr_in addr;
@@ -168,13 +166,10 @@ static void server_init(ServerState *state, const char *node_name) {
     strncpy(state->server_name, node_name, MAX_NODE_NAME - 1);
     state->server_name[MAX_NODE_NAME - 1] = '\0';
 
-    printf("Node Server Init: %s\n", node_name);
-
     if (load_keys(1, node_name, state->aes_key, state->hmac_key, &state->node_id, &state->ec_key)) {
         fprintf(stderr, "Failed to load keys\n");
         exit(1);
     }
-
 
     const char *topics[] = {"npg_control", "npg_pli", "npg_surveillance", "npg_chat",
                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
@@ -184,8 +179,6 @@ static void server_init(ServerState *state, const char *node_name) {
         char topic_name[16];
         snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
         state->topic_priv_keys[i] = load_ec_key(1, topic_name, 1);
-
-        printf("Node Topic Init: %s %s\n", node_name, topic_name);
 
         if (!state->topic_priv_keys[i]) {
             fprintf(stderr, "Failed to load topic private key %s (%s)\n", topics[i], topic_name);

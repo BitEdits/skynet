@@ -15,12 +15,6 @@
 #include <openssl/params.h>
 #include "skynet.h"
 
-#define MAX_NODE_NAME 64
-#define MAX_BUFFER 1590
-#define SERVER_BASE_PATH "~/.skynet/ecc/secp384r1/"
-#define CLIENT_BASE_PATH "~/.skynet_client/ecc/secp384r1/"
-#define HASH_STR_LEN 16
-
 static uint8_t *read_encrypted_file(const char *filename, size_t *file_len) {
     fprintf(stderr, "Debug: Reading encrypted file %s\n", filename);
     FILE *file = fopen(filename, "rb");

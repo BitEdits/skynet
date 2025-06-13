@@ -4,6 +4,15 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define SERVER_BASE_PATH "~/.skynet/ecc/secp384r1/"
+#define CLIENT_BASE_PATH "~/.skynet_client/ecc/secp384r1/"
+
+#define AES_KEY_LEN 32
+#define HMAC_KEY_LEN 32
+#define MAX_NODE_NAME 64
+#define MAX_BUFFER 1590
+#define HASH_STR_LEN 16
+
 #define SKYNET_VERSION 1
 #define SKYNET_MAX_NODES 11000
 #define SKYNET_MAX_PAYLOAD 500
@@ -57,11 +66,11 @@ typedef enum {
 } USMilitaryVehicleType;
 
 typedef enum {
-    SKYNET_MSG_PUBLIC = 0,
+    SKYNET_MSG_KEY_EXCHANGE = 0,
+    SKYNET_MSG_SLOT_REQUEST,
+    SKYNET_MSG_PUBLIC,
     SKYNET_MSG_CHAT,
     SKYNET_MSG_ACK,
-    SKYNET_MSG_KEY_EXCHANGE,
-    SKYNET_MSG_SLOT_REQUEST,
     SKYNET_MSG_WAYPOINT,
     SKYNET_MSG_STATUS,
     SKYNET_MSG_FORMATION
@@ -89,9 +98,8 @@ typedef struct {
     uint8_t hop_count; // 24
     uint8_t iv[16]; // 25
     uint16_t payload_len; // 27
-    uint8_t payload[500];
+    uint8_t payload[MAX_BUFFER];
     uint8_t hmac[32];
-    uint32_t crc;
 } SkyNetMessage;
 
 #define FNV_OFFSET_BASIS_32 2166136261U

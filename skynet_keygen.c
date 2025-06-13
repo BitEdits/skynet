@@ -11,15 +11,11 @@
 #include <openssl/ec.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/core_names.h>
 #include "skynet.h"
 
-#define AES_KEY_LEN 32
-#define HMAC_KEY_LEN 32
-#define MAX_NODE_NAME 64
-#define BASE_PATH_SERVER "~/.skynet/ecc/secp384r1/"
-#define BASE_PATH_CLIENT "~/.skynet_client/ecc/secp384r1/"
-
-static int create_dir(const char *path) {
+int create_dir(const char *path) {
     char *tmp = strdup(path);
     if (!tmp) return -1;
     for (char *p = tmp + 1; *p; p++) {
@@ -40,8 +36,8 @@ static int create_dir(const char *path) {
     return 0;
 }
 
-static int generate_keys(const char *node_name, int is_client) {
-    const char *base_path = is_client ? BASE_PATH_CLIENT : BASE_PATH_SERVER;
+int generate_keys(const char *node_name, int is_client) {
+    const char *base_path = is_client ? CLIENT_BASE_PATH : SERVER_BASE_PATH;
     char *dir_path = expand_home(base_path);
     if (!dir_path) return -1;
 
@@ -55,27 +51,46 @@ static int generate_keys(const char *node_name, int is_client) {
     char hash_str[16];
     snprintf(hash_str, sizeof(hash_str), "%08x", hash);
 
-    char aes_path[256], hmac_path[256], id_path[256], priv_path[256], pub_path[256];
+    char priv_path[256], pub_path[256];
     snprintf(priv_path, sizeof(priv_path), "%s/%s.ec_priv", dir_path, hash_str);
     snprintf(pub_path, sizeof(pub_path), "%s/%s.ec_pub", dir_path, hash_str);
 
-    // Generate secp384r1 key pair
-    EC_KEY *ec_key = EC_KEY_new_by_curve_name(NID_secp384r1);
-    if (!ec_key || !EC_KEY_generate_key(ec_key)) {
-        fprintf(stderr, "Failed to generate EC key pair\n");
+    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_from_name(NULL, "EC", NULL);
+    if (!pctx || EVP_PKEY_keygen_init(pctx) <= 0) {
+        fprintf(stderr, "Failed to initialize key generation context\n");
         print_openssl_error();
-        EC_KEY_free(ec_key);
+        EVP_PKEY_CTX_free(pctx);
         free(dir_path);
         return -1;
     }
 
+    // Set curve
+    if (EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, NID_secp384r1) <= 0) {
+        fprintf(stderr, "Failed to set EC curve\n");
+        print_openssl_error();
+        EVP_PKEY_CTX_free(pctx);
+        free(dir_path);
+        return -1;
+    }
+
+    EVP_PKEY *pkey = NULL;
+    if (EVP_PKEY_keygen(pctx, &pkey) <= 0) {
+        fprintf(stderr, "Failed to generate EC key\n");
+        print_openssl_error();
+        EVP_PKEY_CTX_free(pctx);
+        free(dir_path);
+        return -1;
+    }
+
+    EVP_PKEY_CTX_free(pctx);
+
     // Save private key
     FILE *priv_file = fopen(priv_path, "wb");
-    if (!priv_file || !PEM_write_ECPrivateKey(priv_file, ec_key, NULL, NULL, 0, NULL, NULL)) {
+    if (!priv_file || !PEM_write_PrivateKey(priv_file, pkey, NULL, NULL, 0, NULL, NULL)) {
         fprintf(stderr, "Failed to write private key to %s: %s\n", priv_path, strerror(errno));
         print_openssl_error();
         if (priv_file) fclose(priv_file);
-        EC_KEY_free(ec_key);
+        EVP_PKEY_free(pkey);
         free(dir_path);
         return -1;
     }
@@ -83,18 +98,18 @@ static int generate_keys(const char *node_name, int is_client) {
 
     // Save public key
     FILE *pub_file = fopen(pub_path, "wb");
-    if (!pub_file || !PEM_write_EC_PUBKEY(pub_file, ec_key)) {
+    if (!pub_file || !PEM_write_PUBKEY(pub_file, pkey)) {
         fprintf(stderr, "Failed to write public key to %s: %s\n", pub_path, strerror(errno));
         print_openssl_error();
         if (pub_file) fclose(pub_file);
-        EC_KEY_free(ec_key);
+        EVP_PKEY_free(pkey);
         free(dir_path);
         return -1;
     }
     fclose(pub_file);
 
-    EC_KEY_free(ec_key);
-    printf("Generated keys for node %s (hash: %s) in %s (ID: %u)\n", node_name, hash_str, dir_path);
+    EVP_PKEY_free(pkey);
+    printf("Generated keys for node %s (hash: %s) in %s\n", node_name, hash_str, dir_path);
     free(dir_path);
     return 0;
 }

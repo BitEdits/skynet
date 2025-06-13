@@ -1,41 +1,55 @@
 Skynet
 ======
 
+Skynet is LINK16/TSM/SRW/MQTT inspired tactical protocol for military appliances.
+
+Properties
+----------
+
+* C99 implementation
+* ECC key exchange
+* Microseconds-precise latency
+* Non-Blocking atomic primitives
+* AES-256-GCM encryption
+* Multicast Topics
+* UDP interface
+* OpenSSL based
+
 Message
 -------
 
+Skynet message format is designed for swarms of thousands.
+
 ```
-// SkyNetMessage structure (from project scope)
 typedef struct {
-    uint8_t version;      // 1
-    uint8_t type;         // 0=chat, 1=ack, 2=key, 3=slot, 4=waypoint, 5=status, 6=formation
-    uint32_t npg_id;      // NPG/swarm_id (1–1000)
-    uint32_t node_id;     // Unique node ID
-    uint32_t seq_no;      // Deduplication
-    uint64_t timestamp;   // Relative time (us)
-    uint8_t qos;          // 0=chat, 1=PLI, 2=voice, 3=swarm_cmd
-    uint8_t hop_count;    // 0–3
-    uint8_t iv[16];       // AES-256-GCM IV
-    uint16_t payload_len; // 0–400 bytes
-    uint8_t payload[400]; // Encrypted: chat, PLI, waypoint, status, formation
-    uint8_t hmac[32];     // HMAC-SHA256
-    uint32_t crc;         // CRC-32
+    uint8_t version;       // 1
+    uint8_t type;          // 0=key, 1=slot, 2=chat, 3=ack, 4=waypoint, 5=status, 6=formation
+    uint32_t npg_id;       // NPG/swarm_id (1–1000)
+    uint32_t node_id;      // Unique node ID
+    uint32_t seq_no;       // Deduplication
+    uint64_t timestamp;    // Relative time (us)
+    uint8_t qos;           // 0=chat, 1=PLI, 2=voice, 3=swarm_cmd
+    uint8_t hop_count;     // 0–3
+    uint8_t iv[16];        // AES-256-GCM IV
+    uint16_t payload_len;  // 0–400 bytes
+    uint8_t payload[1590]; // Encrypted: chat, PLI, waypoint, status, formation
+    uint8_t hmac[32];      // HMAC-SHA256
 } SkyNetMessage;
 ```
 
 Types
 -----
 
-* 0: Chat
-* 1: Ack
-* 2: Key Exchange
-* 3: Slot Request
+* 0: Key Exchange
+* 1: Slot Request
+* 2: Chat
+* 3: Ack
 * 4: Waypoint
 * 5: Status
 * 6: Formation
 
-Handling
---------
+Multicast Topics
+----------------
 
 * NPG 1: Process slot_request (type 3) to assign TDMA slots; key_exchange (type 2) for security.
 * NPG 6: Handle status (type 5) for PLI, updating position and velocity for neighbor discovery.
@@ -63,4 +77,4 @@ Author
 ------
 
 * Namdak Tonpa
-* 
+* Moneta Rocco
