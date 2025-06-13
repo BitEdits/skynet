@@ -90,17 +90,6 @@ typedef struct {
     int epoll_fd;
 } WorkerState;
 
-static uint32_t crc32(const uint8_t *data, size_t len) {
-    uint32_t crc = 0xFFFFFFFF;
-    for (size_t i = 0; i < len; i++) {
-        crc ^= data[i];
-        for (int j = 0; j < 8; j++) {
-            crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
-        }
-    }
-    return ~crc;
-}
-
 static void queue_init(MessageQueue *q) {
     atomic_store(&q->head, 0);
     atomic_store(&q->tail, 0);
