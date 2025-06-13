@@ -43,24 +43,18 @@ char *expand_home(const char *path) {
     return expanded;
 }
 
-char *get_base_path(int srv, const char *node_name) {
-    if (strcmp(node_name, "server") == 0) return SERVER_BASE_PATH;
-    if (strcmp(node_name, "client") == 0) return CLIENT_BASE_PATH;
-    if (strcmp(node_name, "40ac3dd2") == 0) return SERVER_BASE_PATH;
-    if (strcmp(node_name, "8f929c1e") == 0) return CLIENT_BASE_PATH;
-    return srv == 0 ? CLIENT_BASE_PATH : SERVER_BASE_PATH;
-}
+
+char *base_path(int srv) { return srv == 0 ? CLIENT_BASE_PATH : SERVER_BASE_PATH; }
 
 char *build_key_path(int srv, const char *node_name, const char *suffix) {
 
-    const char *base_path = get_base_path(srv, node_name);
+    const char *basepath = base_path(srv);
 
-
-    if (!base_path) {
+    if (!basepath) {
         fprintf(stderr, "Invalid node name: %s (must be 'server' or 'client')\n", node_name);
         return NULL;
     }
-    char *dir_path = expand_home(base_path);
+    char *dir_path = expand_home(basepath);
     if (!dir_path) return NULL;
 
     size_t path_len = strlen(dir_path) + 1 + strlen(node_name) + strlen(suffix) + 1;
@@ -177,6 +171,8 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
 
 int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len) {
 
+    fprintf(stderr, "Debug: Starting encryption on %s: from=%x, to=%x, size=%x\n", srv == 0 ? "client" : "server", from_node, to_node, data_len);
+
     if (data_len > SKYNET_MAX_PAYLOAD - 16) {
         fprintf(stderr, "Error: Payload too large: %u > %u\n", data_len, SKYNET_MAX_PAYLOAD - 16);
         return -1;
@@ -187,8 +183,8 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
     snprintf(to_name, sizeof(to_name), "%08x", to_node);
     snprintf(from_name, sizeof(from_name), "%08x", from_node);
 
-    EVP_PKEY *priv_key = load_ec_key(1, from_name, 1);
-    EVP_PKEY *peer_pub_key = load_ec_key(0, to_name, 0);
+    EVP_PKEY *priv_key = load_ec_key(srv, from_name, 1);
+    EVP_PKEY *peer_pub_key = load_ec_key(srv ^ 1, to_name, 0);
 
     if (!priv_key || !peer_pub_key) {
         EVP_PKEY_free(priv_key);
@@ -212,10 +208,15 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
         return -1;
     }
 
+    fprintf(stderr, "Debug: Enryption done OK\n");
+
     return 0;
 }
 
 int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_node) {
+
+    fprintf(stderr, "Debug: Starting decryption on %s: from=%x, to=%x, size=%x\n", srv == 0 ? "client" : "server", from_node, to_node, msg->payload_len);
+
     if (!msg || !to_node || !from_node) {
         fprintf(stderr, "Error: Null pointer in skynet_decrypt\n");
         return -1;
@@ -254,6 +255,8 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
         fprintf(stderr, "Error: Payload decryption failed\n");
         return -1;
     }
+
+    fprintf(stderr, "Debug: Decryption done OK\n");
 
     return 0;
 }
@@ -546,24 +549,8 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     return 0;
 }
 
+// load_private
 int load_keys(int srv, const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key) {
-
-    const char *base_path = get_base_path(srv, node_name);
-    char *dir_path = expand_home(base_path);
-    if (!dir_path) return -1;
-    char aes_path[256], hmac_path[256], id_path[256];
-    snprintf(aes_path, sizeof(aes_path), "%s/%s.aes", dir_path, node_name);
-    snprintf(hmac_path, sizeof(hmac_path), "%s/%s.hmac", dir_path, node_name);
-    snprintf(id_path, sizeof(id_path), "%s/%s.id", dir_path, node_name);
-    free(dir_path);
-
-    FILE *file = fopen(aes_path, "rb");
-    if (!file || fread(aes_key, 1, 32, file) != 32) {
-        fprintf(stderr, "Failed to read AES key from %s: %s\n", aes_path, file ? strerror(errno) : "null file");
-        if (file) fclose(file);
-        return -1;
-    }
-    fclose(file);
 
     *ec_key = load_ec_key(srv, node_name, 1);
     if (!*ec_key) return -1;
@@ -582,8 +569,8 @@ uint32_t fnv1a_32(const void *data, size_t len) {
 }
 
 
-int save_public_key(const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
-    char *dir_path = expand_home(SERVER_BASE_PATH);
+int save_public_key(int srv, const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
+    char *dir_path = expand_home(base_path(srv));
     if (!dir_path) return -1;
     uint32_t hash = fnv1a_32(node_name, strlen(node_name));
     char hash_str[16];

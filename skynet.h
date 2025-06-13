@@ -110,8 +110,8 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
 int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key);
 EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private);
 int load_keys(int srv, const char *node_name, uint8_t *aes_key, uint8_t *hmac_key, uint32_t *node_id, EVP_PKEY **ec_key);
-char *get_base_path(int srv, const char *node_name);
-int save_public_key(const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len);
+char *base_path(int srv);
+int save_public_key(int srv, const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len);
 void print_openssl_error(void);
 char *expand_home(const char *path);
 int set_non_blocking(int fd);

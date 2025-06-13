@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         char node_name[16];
         snprintf(node_name, sizeof(node_name), "%08x", topic_hash);
 
-        topic_pub_keys[i] = load_ec_key(1, node_name, 0);
+        topic_pub_keys[i] = load_ec_key(0, node_name, 0);
         if (!topic_pub_keys[i]) {
             fprintf(stderr, "Failed to load topic public key %s\n", topics[i]);
             EVP_PKEY_free(ec_key);
@@ -130,11 +130,11 @@ int main(int argc, char *argv[]) {
     uint32_t current_slot = 0;
     uint32_t seq_no = 0;
 
-    // Send initial key exchange with public key only
-    SkyNetMessage msg;
+    SkyNetMessage msg; // Send initial key exchange with public key only
     skynet_init(&msg, SKYNET_MSG_KEY_EXCHANGE, node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
     msg.seq_no = seq_no++;
     msg.timestamp = get_time_us();
+
     BIO *bio = BIO_new(BIO_s_mem());
     if (!bio || !PEM_write_bio_PUBKEY(bio, ec_key)) {
         fprintf(stderr, "Failed to serialize public key\n");
@@ -145,6 +145,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
+
     char pub_key_data[512];
     long pub_key_len = BIO_read(bio, pub_key_data, sizeof(pub_key_data));
     BIO_free(bio);
@@ -156,28 +157,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    EVP_PKEY *priv_key = load_ec_key(0, node_name, 1);
-    EVP_PKEY *public_key = load_ec_key(1, "40ac3dd2", 1);
+    skynet_encrypt(0, &msg, node_id, 0x40ac3dd2, (uint8_t *)pub_key_data, pub_key_len);
 
-    if (!priv_key) {
-        EVP_PKEY_free(priv_key);
-        return 1;
-    }
-
-    if (derive_shared_key(priv_key, public_key, aes_key, hmac_key) < 0) {
-        EVP_PKEY_free(priv_key);
-        EVP_PKEY_free(public_key);
-        return 1;
-    }
-
-    printf("Node name: %s\n", node_name);
-    skynet_set_data(&msg, (uint8_t *)pub_key_data, pub_key_len, aes_key, hmac_key);
     skynet_print(&msg);
     int len = skynet_serialize(&msg, buffer, MAX_BUFFER);
+
     if (len > 0) {
 
         printf("SERIALIZED LEN: %d\n", len);
-        hex_dump("SKY HEX DUMP", &msg, len);
+        hex_dump("SKY HEX DUMP", (char *)&msg, len);
 
         if (sendto(sock_fd, buffer, len, 0, (struct sockaddr *)&npg_addrs[0], sizeof(npg_addrs[0])) < 0) {
             perror("Send key exchange failed");
@@ -276,7 +264,7 @@ int main(int argc, char *argv[]) {
                     uint32_t hash = fnv1a_32(SERVER_NAME, strlen(SERVER_NAME));
                     char hash_str[16];
                     snprintf(hash_str, sizeof(hash_str), "%08x", hash);
-                    printf("Control: %s\n", hash_str);
+                    printf("Control 1: %x\n", rx_msg.npg_id);
                     dec_key = load_ec_key(0, hash_str, 0);
                     if (!dec_key) continue;
                     if (derive_shared_key(ec_key, dec_key, dec_key_key, dec_hmac_key) < 0) {
@@ -284,6 +272,7 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
                 } else {
+                    printf("Control 2: %x\n", rx_msg.npg_id);
                     int topic_idx = -1;
                     switch (rx_msg.npg_id) {
                         case SKYNET_NPG_PLI: topic_idx = 1; break;
@@ -305,7 +294,7 @@ int main(int argc, char *argv[]) {
                     printf("Received on NPG %u, seq %u: ", rx_msg.npg_id, rx_msg.seq_no);
                     skynet_print(&rx_msg);
                     if (rx_msg.type == SKYNET_MSG_KEY_EXCHANGE && rx_msg.npg_id == SKYNET_NPG_CONTROL && !server_joined) {
-                        if (save_public_key(SERVER_NAME, rx_msg.payload, rx_msg.payload_len) == 0) {
+                        if (save_public_key(0, SERVER_NAME, rx_msg.payload, rx_msg.payload_len) == 0) {
                             printf("Saved server public key for %s\n", SERVER_NAME);
                             server_joined = 1;
                         }

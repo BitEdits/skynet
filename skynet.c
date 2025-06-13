@@ -370,7 +370,7 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
             fprintf(stderr, "Invalid or too long node name in key exchange\n");
             return;
         }
-        if (save_public_key(client_name, msg->payload, msg->payload_len) == 0) {
+        if (save_public_key(1, client_name, msg->payload, msg->payload_len) == 0) {
             printf("Saved public key for client %s\n", client_name);
             SkyNetMessage response;
             skynet_init(&response, 0x40ac3dd2, msg->node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
@@ -472,14 +472,10 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
     snprintf(topic_str, 16, "%08x", topic_hash);
 
     uint32_t to = (msg->npg_id == SKYNET_NPG_CONTROL ? 0x40ac3dd2 : topic_hash);
-    char to_str[16];
-    char from_str[16];
-    snprintf(to_str, 16, "%08x", to);
-    snprintf(from_str, 16, "%08x", msg->node_id);
 
-    printf("RCVD [NPG:%d][%s][seq:%u][node:%x][type:%d][src:%s:%d][server:%s][to:%s]\n",
+    printf("RCVD [NPG:%d][%s][seq:%u][node:%x][type:%d][src:%s:%d][server:%s][to:%x]\n",
            msg->npg_id, topic, msg->seq_no, msg->node_id, msg->type,
-           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port), state->server_name, to_str);
+           inet_ntoa(addr->sin_addr), ntohs(addr->sin_port), state->server_name, to);
 
     if (is_duplicate(state, msg->node_id, msg->seq_no, msg->type, addr)) {
         return;
@@ -489,31 +485,19 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
 
         // don't decrypt
 
-    } else {
+//     } else {
 
         // decrypt
 
         hex_dump("SKY HEX DUMP", (const uint8_t *)msg, 309);
 
-        EVP_PKEY *priv_key = load_ec_key(0, to_str, 1);
-        EVP_PKEY *public_key = load_ec_key(1, from_str, 1);
-
-        if (!priv_key) {
-            EVP_PKEY_free(priv_key);
-            return;
-        }
-
-        if (derive_shared_key(priv_key, public_key, aes_key, hmac_key) < 0) {
-            EVP_PKEY_free(priv_key);
-            EVP_PKEY_free(public_key);
-            return;
-        }
-
-        if (skynet_decrypt(1, msg, from_str, topic_str) < 0) {
+        if (skynet_decrypt(1, msg, to, msg->node_id) < 0) {
             fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
             return;
         }
+
     }
+
     switch (msg->type) {
         case SKYNET_MSG_PUBLIC:
         case SKYNET_MSG_CHAT:
