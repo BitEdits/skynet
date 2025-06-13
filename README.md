@@ -63,7 +63,6 @@ Joined multicast group 239.255.0.102
 Joined multicast group 239.255.0.103
 SERIALIZED LEN: 305
 Node 2408750110 (8f929c1e) added from 172.23.86.121:32796
-SkyNetMessage: version=1, type=0, npg_id=1, node_id=8f929c1e, seq_no=0, timestamp=1749776784170868, qos=3, hop_count=0, payload_len=231
 Debug: Starting decryption on server: from=8f929c1e, to=40ac3dd2, size=e7
 Debug: Accessing keystore: /home/tonpa/.skynet/ecc/secp384r1/40ac3dd2.ec_priv
 Debug: Accessing keystore: /home/tonpa/.skynet_client/ecc/secp384r1/8f929c1e.ec_pub
@@ -100,9 +99,6 @@ Debug: Accessing keystore: /home/tonpa/.skynet_client/ecc/secp384r1/06c5bc52.ec_
 Debug: Enryption done OK
 SENT [NPG:1][seq:2][multicast:239.255.0.1] latency [us:5066]
 SERIALIZED LEN: 108
-SkyNetMessage: version=1, type=210, npg_id=1, node_id=8f929c1e, seq_no=2, timestamp=0, qos=3, hop_count=0, payload_len=34
-[[2025-06-13 04:06:24]] Dropped duplicate message from node 2408750110, type=210, seq=2, src=172.23.86.121:6566
-Node 2408750110 (8f929c1e) timed out, removing
 Debug: Starting encryption on server: from=40ac3dd2, to=6c5bc52, size=0
 Debug: Accessing keystore: /home/tonpa/.skynet/ecc/secp384r1/40ac3dd2.ec_priv
 Debug: Accessing keystore: /home/tonpa/.skynet_client/ecc/secp384r1/06c5bc52.ec_pub
