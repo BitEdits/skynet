@@ -13,7 +13,7 @@ Properties
 * AES-256-GCM encryption
 * Multicast Topics
 * UDP interface
-* Only POSIX/OpenSSL dependencies (replaceable)
+* Ony one dependency (OpenSSL, replaceable)
 * 64KB L1 footprint
 
 Install
