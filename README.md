@@ -16,8 +16,8 @@ Properties
 * Only POSIX/OpenSSL dependencies
 & 64KB L1 footprint
 
-Run
----
+Install
+-------
 
 ```
 $ git clone git@github.com:BitEdits/skynet
