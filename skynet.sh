@@ -6,8 +6,6 @@ gcc -o skynet_decrypt  skynet_decrypt.c skynet_proto.c -lcrypto
 gcc -o skynet_encrypt  skynet_encrypt.c skynet_proto.c -lcrypto
 gcc -o skynet_keygen   skynet_keygen.c  skynet_proto.c -lcrypto
 
-cp -f /home/tonpa/.skynet/ecc/secp384r1/*.ec_pub /home/tonpa/.skynet_client/ecc/secp384r1/
-
 ./skynet_keygen npg_control      --server
 ./skynet_keygen npg_pli          --server
 ./skynet_keygen npg_surveillance --server

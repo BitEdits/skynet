@@ -733,9 +733,7 @@ int main(int argc, char *argv[]) {
     }
 
     atomic_store(&state.running, 0);
-    for (int i = 0; i < THREAD_COUNT; i++) {
-        pthread_join(state.workers[i], NULL);
-    }
+    for (int i = 0; i < THREAD_COUNT; i++) { pthread_join(state.workers[i], NULL); }
     close(state.timer_fd);
     close(state.epoll_fd);
     close(state.socket_fd);

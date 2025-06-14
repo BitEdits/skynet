@@ -13,12 +13,11 @@ Properties
 * Non-Blocking Atomic Primitives
 * Multicore Processing
 * AES-256-GCM Encryption
-* Multicast Topics
+* Topics on Multicast
 * UDP Interface
 * Single dependency (OpenSSL, replaceable)
-* 64KB L1 footprint
 * Threat model doesn't require non-repudiation (HMAC)
-* 2000 LOC size
+* 64KB L1 footprint, 2000 LOC
 
 Install
 -------
