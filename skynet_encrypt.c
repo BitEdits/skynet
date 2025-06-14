@@ -44,8 +44,8 @@ static uint8_t *read_payload_file(const char *filename, size_t *payload_len) {
         return NULL;
     }
 
-    if (file_size > SKYNET_MAX_PAYLOAD - 16) { /* Reserve 16 bytes for GCM tag */
-        fprintf(stderr, "Payload file too large (%ld bytes, max %d)\n", file_size, SKYNET_MAX_PAYLOAD - 16);
+    if (file_size > MAX_BUFFER - 16) { /* Reserve 16 bytes for GCM tag */
+        fprintf(stderr, "Payload file too large (%ld bytes, max %d)\n", file_size, MAX_BUFFER - 16);
         fclose(file);
         return NULL;
     }

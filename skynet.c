@@ -201,7 +201,7 @@ int is_duplicate(ServerState *state, uint32_t node_id, uint32_t seq_no, uint8_t 
         if (atomic_load(&state->seqs[idx].claimed)) {
             if (state->seqs[idx].node_id == node_id && state->seqs[idx].seq_no == seq_no) {
                 if (current_time - state->seqs[idx].timestamp < 2) {
-                    printf("[[%s]] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n",
+                    printf("[%s] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n",
                            time_str, node_id, type, seq_no, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
                     return 1;
                 }
