@@ -112,11 +112,10 @@ typedef struct  __attribute__((packed)) {
 
 uint32_t fnv1a_32(const void *data, size_t len);
 void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, uint32_t npg_id, uint8_t qos);
-void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key);
+void skynet_encrypt_payload(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key);
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size);
 int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_size);
 void skynet_print(const SkyNetMessage *msg);
-int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key);
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key);
 int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len);
 int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_node);

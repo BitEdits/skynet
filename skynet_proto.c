@@ -82,11 +82,6 @@ EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private) {
     return key;
 }
 
-void prepare_node_names(uint32_t from_node, uint32_t to_node, char *from_name, char *to_name) {
-    snprintf(to_name, 16, "%08x", to_node);
-    snprintf(from_name, 16, "%08x", from_node);
-}
-
 int load_keys(int srv, const char *from_name, const char *to_name, EVP_PKEY **priv_key, EVP_PKEY **peer_pub_key) {
     *priv_key = load_ec_key(srv, from_name, 1);
     *peer_pub_key = load_ec_key(srv ^ 1, to_name, 0);
@@ -157,36 +152,6 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
     return 0;
 }
 
-uint8_t *prepare_auth_data(const SkyNetMessage *msg, uint32_t *data_len) {
-    *data_len = 2 + 4 + 4 + 4 + 16 + 2;
-    if (*data_len > MAX_BUFFER + 32) {
-        fprintf(stderr, "Error: Auth data length too large: %u\n", *data_len);
-        return NULL;
-    }
-
-    uint8_t *auth_data = malloc(*data_len);
-    if (!auth_data) {
-        fprintf(stderr, "Error: Memory allocation failed for auth data\n");
-        return NULL;
-    }
-
-    size_t offset = 0;
-    auth_data[offset++] = (msg->version << 4) | (msg->type & 0x0F);
-    auth_data[offset++] = (msg->qos << 4) | (msg->hop_count & 0x0F);
-    *(uint32_t *)(auth_data + offset) = htonl(msg->npg_id); offset += 4;
-    *(uint32_t *)(auth_data + offset) = htonl(msg->node_id); offset += 4;
-    *(uint32_t *)(auth_data + offset) = htonl(msg->seq_no); offset += 4;
-    memcpy(auth_data + offset, msg->iv, 16); offset += 16;
-    *(uint16_t *)(auth_data + offset) = htons(msg->payload_len); offset += 2;
-
-    if (offset != *data_len) {
-        fprintf(stderr, "Error: Auth data length mismatch: %zu != %u\n", offset, *data_len);
-        free(auth_data);
-        return NULL;
-    }
-    return auth_data;
-}
-
 int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len) {
 
     if (data_len > MAX_BUFFER - 16) {
@@ -195,7 +160,8 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
     }
 
     char from_name[16], to_name[16];
-    prepare_node_names(from_node, to_node, from_name, to_name);
+    snprintf(to_name, 16, "%08x", to_node);
+    snprintf(from_name, 16, "%08x", from_node);
 
     EVP_PKEY *priv_key = NULL, *peer_pub_key = NULL;
     if (load_keys(srv, from_name, to_name, &priv_key, &peer_pub_key) < 0) return -1;
@@ -210,7 +176,7 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
     EVP_PKEY_free(priv_key);
     EVP_PKEY_free(peer_pub_key);
 
-    skynet_set_data(msg, data, data_len, aes_key);
+    skynet_encrypt_payload(msg, data, data_len, aes_key);
     if (msg->payload_len == 0) {
         fprintf(stderr, "Error: Failed to set encrypted data\n");
         return -1;
@@ -227,7 +193,8 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
     }
 
     char from_name[16], to_name[16];
-    prepare_node_names(from_node, to_node, from_name, to_name);
+    snprintf(to_name, 16, "%08x", to_node);
+    snprintf(from_name, 16, "%08x", from_node);
 
     EVP_PKEY *priv_key = NULL, *peer_pub_key = NULL;
     if (load_keys(srv, to_name, from_name, &priv_key, &peer_pub_key) < 0) {
@@ -268,64 +235,6 @@ void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, u
     }
 }
 
-void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key) {
-    if (!msg || !aes_key) {
-        fprintf(stderr, "Error: Null pointer in skynet_set_data\n");
-        return;
-    }
-    if (data_length > MAX_BUFFER - 16) {
-        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_length, MAX_BUFFER - 16);
-        return;
-    }
-
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) {
-        print_openssl_error();
-        return;
-    }
-
-    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1 ||
-        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1 ||
-        EVP_EncryptInit_ex(ctx, NULL, NULL, aes_key, msg->iv) != 1) {
-        print_openssl_error();
-        EVP_CIPHER_CTX_free(ctx);
-        return;
-    }
-
-    int outlen = 0, finallen = 0;
-    uint8_t outbuf[MAX_BUFFER];
-    if (data && data_length > 0) {
-        if (EVP_EncryptUpdate(ctx, outbuf, &outlen, data, data_length) != 1) {
-            print_openssl_error();
-            EVP_CIPHER_CTX_free(ctx);
-            return;
-        }
-    }
-
-    if (EVP_EncryptFinal_ex(ctx, outbuf + outlen, &finallen) != 1) {
-        print_openssl_error();
-        EVP_CIPHER_CTX_free(ctx);
-        return;
-    }
-
-    msg->payload_len = outlen + finallen;
-    if (msg->payload_len > MAX_BUFFER - 16) {
-        fprintf(stderr, "Error: Encrypted payload too large: %u\n", msg->payload_len);
-        EVP_CIPHER_CTX_free(ctx);
-        return;
-    }
-
-    memcpy(msg->payload, outbuf, msg->payload_len);
-
-    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, msg->payload + msg->payload_len) != 1) {
-        print_openssl_error();
-        EVP_CIPHER_CTX_free(ctx);
-        return;
-    }
-    msg->payload_len += 16;
-    EVP_CIPHER_CTX_free(ctx);
-    fprintf(stderr, "%sEncryption successful, from=%x, to=%x, size=%u.%s\n", YELLOW, msg->node_id, msg->npg_id, msg->payload_len, RESET);
-}
 
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size) {
     if (!msg || !buffer) {
@@ -399,6 +308,65 @@ void skynet_print(const SkyNetMessage *msg) {
            "seq_no=%u, qos=%u, hop=%u, payload_len=%u%s\n", BLUE,
            msg->version, msg->type, msg->npg_id, msg->node_id,
            msg->seq_no, msg->qos, msg->hop_count, msg->payload_len, RESET);
+}
+
+void skynet_encrypt_payload(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key) {
+    if (!msg || !aes_key) {
+        fprintf(stderr, "Error: Null pointer in skynet_encrypt_payload\n");
+        return;
+    }
+    if (data_length > MAX_BUFFER - 16) {
+        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_length, MAX_BUFFER - 16);
+        return;
+    }
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        print_openssl_error();
+        return;
+    }
+
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1 ||
+        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1 ||
+        EVP_EncryptInit_ex(ctx, NULL, NULL, aes_key, msg->iv) != 1) {
+        print_openssl_error();
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+
+    int outlen = 0, finallen = 0;
+    uint8_t outbuf[MAX_BUFFER];
+    if (data && data_length > 0) {
+        if (EVP_EncryptUpdate(ctx, outbuf, &outlen, data, data_length) != 1) {
+            print_openssl_error();
+            EVP_CIPHER_CTX_free(ctx);
+            return;
+        }
+    }
+
+    if (EVP_EncryptFinal_ex(ctx, outbuf + outlen, &finallen) != 1) {
+        print_openssl_error();
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+
+    msg->payload_len = outlen + finallen;
+    if (msg->payload_len > MAX_BUFFER - 16) {
+        fprintf(stderr, "Error: Encrypted payload too large: %u\n", msg->payload_len);
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+
+    memcpy(msg->payload, outbuf, msg->payload_len);
+
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, msg->payload + msg->payload_len) != 1) {
+        print_openssl_error();
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+    msg->payload_len += 16;
+    EVP_CIPHER_CTX_free(ctx);
+    fprintf(stderr, "%sEncryption successful, from=%x, to=%x, size=%u.%s\n", YELLOW, msg->node_id, msg->npg_id, msg->payload_len, RESET);
 }
 
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {

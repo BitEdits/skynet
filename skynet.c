@@ -78,7 +78,6 @@ typedef struct {
     struct sockaddr_in server_addr;
     atomic_int timer_active;
     uint8_t aes_key[32];
-    uint8_t hmac_key[32];
     EVP_PKEY *ec_key;
     char server_name[MAX_NODE_NAME];
     EVP_PKEY *topic_priv_keys[8];
