@@ -31,8 +31,8 @@ Principles
 * Subscribers Queue per Topic
 * Key Store per Executable
 
-Install
--------
+Installation
+------------
 
 The system should be able to deploy with one script `skynet.sh` having mounted key stores of all network allowed devices.
 
