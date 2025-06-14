@@ -3,9 +3,11 @@
 Link32 is a tactical communication protocol inspired by VMF, LINK16, TSM, SRW, and MQTT,
 designed for military applications requiring low-latency, secure, and scalable data
 exchange in contested environments. It supports swarm coordination, real-time position
-location information (PLI), command and control (C2), and tactical chat over UDP-based multicast networks.
+location information (PLI), command and control (C2), and tactical chat over UDP-based
+multicast networks.
 
-Skynet is the reference server implementing Link32 tactical battlefield protocol.
+Skynet is the reference server implementing Link32 tactical battlefield protocol implemented
+in pure C99 with zero dependencies (awaiting OpenSSL replacement).
 
 ## Properties
 
@@ -21,7 +23,7 @@ Skynet is the reference server implementing Link32 tactical battlefield protocol
 
 ## Principles
 
-* Automated Key Provisioning: Single script distributes ECC key pairs for nodes and topics.
+* Key Provisioning: Single script (skynet.sh) generates ECC key pairs for nodes and topics; public keys require manual distribution.
 * Mandatory Encryption: All messages are encrypted with AES-256-GCM.
 * Node Identification: Node names are hashed to 32-bit using FNV-1a for compact addressing.
 * Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap (CMPXCHG) for concurrency.
@@ -33,7 +35,7 @@ Skynet is the reference server implementing Link32 tactical battlefield protocol
 
 ### S-Message Format
 
-The SkyNetMessage structure is compact, designed for swarms of thousands of nodes:
+The Skynet Message structure is compact, designed for swarms of thousands of nodes:
 
 ```
 typedef struct {
@@ -79,7 +81,6 @@ typedef struct {
 | 102 | npg_logistics | 239.255.0.102 | Handles status (type 5) and chat (type 2) for logistical coordination. |
 | 103 | npg_coord | 239.255.0.103 | Relays chat (type 2), waypoint (type 4), and formation (type 6) for inter-agent coordination. |
 
-
 ### Slot Management
 
 Link32 uses a minimalistic Time Division Multiple Access (TDMA)-like slot manager to reduce message collisions and emulate dynamic topics:
@@ -100,8 +101,9 @@ Implementation details:
 To prevent message loops and duplicates, the server uses a fixed-size circular buffer (`seq_cache[SEQ_CACHE_SIZE=1024]`) for deduplication:
 
 * Structure: Each entry stores `{node_id, seq_no, timestamp}`.
-* Memory: ~8KB (1024 × 8 bytes per entry).
+* Memory: ~16KB (1024 × 16 bytes per entry: 4 for node_id, 4 for seq_no, 8 for timestamp).
 * Complexity: O(1) lookup and update using FNV-1a hashing.
+* Timestamp Threshold: Discards duplicates received within 1 second.
 
 Implementation details:
 
@@ -145,15 +147,13 @@ Nodes subscribe to topics based on their role, joining the corresponding multica
 ```
 $ git clone git@github.com:BitEdits/skynet
 $ cd skynet
-$ gcc -o skynet_keygen skynet_keygen.c skynet_proto.c -lcrypto
 $ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
-$ gcc -o skynet        skynet.c        skynet_proto.c -lcrypto
+$ gcc -o skynet skynet.c skynet_proto.c -pthread -lcrypto
 ```
 
 ### Installation
 
-Link32 deploys via a single provisioning script (skynet.sh), which generates ECC key
-pairs for all network nodes and topics. Public keys must be copied to client key stores for mutual authentication.
+Link32 deploys via a provisioning script (skynet.sh), which generates ECC key pairs for all network nodes and topics. Public keys must be manually copied to client key stores for mutual authentication.
 
 ```
 $ ./skynet.sh
@@ -167,17 +167,12 @@ Generated keys for node npg_logistics (hash: 542105cc) in /home/user/.skynet/ecc
 Generated keys for node npg_coord (hash: e46c0c22) in /home/user/.skynet/ecc/secp384r1/
 Generated keys for node server (hash: 40ac3dd2) in /home/user/.skynet/ecc/secp384r1/
 Generated keys for node client (hash: 8f929c1e) in /home/user/.skynet_client/ecc/secp384r1/
-$ cp /home/user/.skynet/ecc/secp384r1/*.ec_pub /home/user/.skynet_client/ecc/secp384r1/
+$ cp ~/.skynet/ecc/secp384r1/*.ec_pub ~/.skynet_client/ecc/secp384r1/
 ```
 
 ### Server Operation
 
-The server `skynet` binds to UDP port 6566, joins multicast groups for all
-topics (239.255.0.<npg_id>), and processes incoming messages using a global
-network queue (MessageQueue mq). It spawns worker threads (default: 4) pinned
-to CPU cores for concurrent message handling. Each topic has a dedicated
-subscriber queue (topic_queues[MAX_TOPICS]), and messages are forwarded
-to slot-specific multicast groups (239.255.1.<slot_id>) for dynamic topics.
+The server `skynet` binds to UDP port 6566, joins multicast groups for all topics (239.255.0.<npg_id>), and processes incoming messages using a global network queue (MessageQueue mq). It spawns worker threads (default: THREAD_COUNT=4) pinned to CPU cores for concurrent message handling. Each topic has a dedicated subscriber queue (topic_queues[MAX_TOPICS]), and messages are forwarded to slot-specific multicast groups (239.255.1.<slot_id>) for dynamic topics.
 
 Example server output:
 
@@ -200,9 +195,9 @@ Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0, latency=36643.
 
 The client `skynet_client` connects to port 6566, joins topic-specific multicast groups, and sends:
 
-A key exchange message (SKYNET_MSG_KEY_EXCHANGE) to 239.255.0.1.
-A slot request (SKYNET_MSG_SLOT_REQUEST) to 239.255.0.1.
-Periodic status messages (SKYNET_MSG_STATUS) to the assigned slot’s multicast group (239.255.1.<slot_id>) or topic group (239.255.0.6 for PLI).
+* A key exchange message (SKYNET_MSG_KEY_EXCHANGE) to 239.255.0.1.
+* A slot request (SKYNET_MSG_SLOT_REQUEST) to 239.255.0.1.
+* Periodic status messages (SKYNET_MSG_STATUS) to the assigned slot’s multicast group (239.255.1.<slot_id>) or topic group (239.255.0.6 for PLI), limited to 10 messages by default (MESSAGE_LIMIT=10).
 
 Example client output:
 
@@ -226,6 +221,21 @@ Sent status message: pos=[0.1, 0.1, 0.1], vel=[0.0, 0.0, 0.0], seq=2, multicast=
 3. The client sends key exchange, slot request, and status messages.
 4. The server assigns a slot, forwards status messages to `239.255.1.<slot_id>`, and logs all activity.
 
+### Utilities
+
+#### `skynet_keygen <node> [--server|--client]`
+
+Generates ECC secp384r1 key pairs for the specified node,
+storing them in `~/.skynet/ecc/secp384r1/` (server) or `~/.skynet_client/ecc/secp384r1/` (client).
+
+#### `skynet_encrypt <sender> <recipient> <file>`
+
+Encrypts a test message from `<sender>` to `<recipient>` for the specified NPG, producing `<npg_id>.sky`.
+
+#### `skynet_decrypt <sender> <recipient> <file.sky>`
+
+Decrypts `<file>` (e.g., `<npg_id>.sky`) using keys for `<sender>` and `<recipient>`.
+
 ### Limitations
 
 * Slot Scalability: Fixed `SLOT_COUNT=256` limits dynamic topics to 256 nodes.
@@ -236,4 +246,3 @@ Sent status message: pos=[0.1, 0.1, 0.1], vel=[0.0, 0.0, 0.0], seq=2, multicast=
 ## Author
 
 * Namdak Tonpa
-

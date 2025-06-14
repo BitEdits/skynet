@@ -17,7 +17,7 @@ gcc -o skynet_keygen   skynet_keygen.c  skynet_proto.c -lcrypto
 ./skynet_keygen server           --server
 ./skynet_keygen client           --client
 
-cp /home/user/.skynet/ecc/secp384r1/*.ec_pub /home/user/.skynet_client/ecc/secp384r1/
+cp ~/.skynet/ecc/secp384r1/*.ec_pub ~/.skynet_client/ecc/secp384r1/
 
 ./skynet_encrypt client server 1
 ./skynet_decrypt client server 1.sky
