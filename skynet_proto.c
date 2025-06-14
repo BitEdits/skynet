@@ -511,10 +511,7 @@ uint64_t get_time_us(void) {
 
 void hex_dump(const char *label, const uint8_t *data, size_t len) {
     fprintf(stderr, "%s:\n", label);
-    for (size_t i = 0; i < len; i++) {
-        fprintf(stderr, "%02x ", data[i]);
-        if (i % 16 == 15) fprintf(stderr, "\n");
-    }
-    if (len % 16 != 0) fprintf(stderr, "\n");
+    for (size_t i = 0; i < len; i++) { fprintf(stderr, "%02x ", data[i]); if (i % 32 == 31) fprintf(stderr, "\n"); }
+    if (len % 32 != 0) fprintf(stderr, "\n");
 }
 
