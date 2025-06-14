@@ -19,6 +19,17 @@ Properties
 * Threat model doesn't require non-repudiation (HMAC)
 * 64KB L1 footprint, 2000 LOC
 
+Principles
+----------
+
+* Single script keys provisioning
+* There is no way to send unencrypted message
+* Node names converted internally with FNV1a 32-bit hashes
+* No mutexes/semaphores allowed, only atomic lock-free CMPXCHG instructions
+* Topics using IP multicast
+* Multicore Processing from Global Network Queue
+* Subscribers Queue per Topic
+
 Install
 -------
 
