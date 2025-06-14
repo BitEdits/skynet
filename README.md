@@ -6,14 +6,16 @@ Link32 is a VMF/LINK16/TSM/SRW/MQTT inspired tactical protocol for military appl
 Properties
 ----------
 
-* C99 implementation
-* ECC key exchange
-* Microseconds-precise latency
-* Non-Blocking atomic primitives
-* AES-256-GCM encryption
+* C99 Implementation
+* 32 bytes Minimal Message (including IV)
+* ECC DH Key Exchange
+* Microseconds-precise Latency
+* Non-Blocking Atomic Primitives
+* Multicore Processing
+* AES-256-GCM Encryption
 * Multicast Topics
-* UDP interface
-* Ony one dependency (OpenSSL, replaceable)
+* UDP Interface
+* Single dependency (OpenSSL, replaceable)
 * 64KB L1 footprint
 
 Install

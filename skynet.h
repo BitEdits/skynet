@@ -87,18 +87,16 @@ typedef enum {
     NODE_ROLE_SPACE_VEHICLE
 } NodeRole;
 
-typedef struct {
-    uint8_t version;        // 1 byte
-    uint8_t type;           // 1 byte
-    uint32_t npg_id;        // 4 bytes
-    uint32_t node_id;       // 4 bytes
-    uint32_t seq_no;        // 4 bytes
-    uint64_t timestamp;     // 8 bytes
-    uint8_t qos;            // 1 byte
-    uint8_t hop_count;      // 1 byte
-    uint8_t iv[16];         // 16 bytes
-    uint8_t hmac[32];       // 32 bytes
-    uint16_t payload_len;   // 2 bytes
+typedef struct  __attribute__((packed)) {
+    uint8_t version : 4;         // 1/2 byte
+    uint8_t type : 4;            // 1/2 byte
+    uint8_t qos : 4;             // 1/2 byte
+    uint8_t hop_count : 4;       // 1/2 byte
+    uint32_t npg_id;             // 4   bytes
+    uint32_t node_id;            // 4   bytes
+    uint32_t seq_no;             // 4   bytes
+    uint8_t iv[16];              // 16  bytes
+    uint16_t payload_len;        // 2   bytes
     uint8_t payload[MAX_BUFFER]; // Variable
 } SkyNetMessage;
 
@@ -107,7 +105,7 @@ typedef struct {
 
 uint32_t fnv1a_32(const void *data, size_t len);
 void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, uint32_t npg_id, uint8_t qos);
-void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key, const uint8_t *hmac_key);
+void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key);
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size);
 int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_size);
 void skynet_print(const SkyNetMessage *msg);
@@ -115,7 +113,7 @@ int skynet_verify_hmac(const SkyNetMessage *msg, const uint8_t *hmac_key);
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key);
 int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len);
 int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_node);
-int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key, uint8_t *hmac_key);
+int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key);
 EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private);
 int load_private(int srv, const char *node_name, EVP_PKEY **ec_key);
 char *base_path(int srv);
