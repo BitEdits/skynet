@@ -409,6 +409,12 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
         return -1;
     }
 
+    if (EVP_DecryptFinal_ex(ctx, outbuf + outlen, &finallen) != 1) {
+        print_openssl_error();
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
+    }
+
     memcpy(msg->payload, outbuf, outlen + finallen);
     msg->payload_len = outlen + finallen;
     EVP_CIPHER_CTX_free(ctx);
