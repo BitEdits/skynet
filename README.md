@@ -157,6 +157,27 @@ Multicast Topics
 * NPG 102: Handle status (type 5) and chat (type 0) for logistics.
 * NPG 103: Relay chat (type 0), waypoint (type 4), and formation (type 6) for coordination.
 
+Slot Management
+---------------
+
+* Clients self-coordinating slots could lead to collisions. 
+* Minimalistic slot management to emulate dynamic topics as a second stage after multicast.
+* Implement a simple TDMA-like slot manager in the server using a fixed-size slot array (`slots[SLOT_COUNT]`) in `ServerState`.
+* Each slot is assigned to a `node_id` or free (0). Slots are used to grant transmission windows, reducing collisions.
+* Clients send `SKYNET_MSG_SLOT_REQUEST` with their `node_id` and desired `npg_id`. The server assigns a free slot and responds with `SKYNET_MSG_ACK` containing the slot number.
+* To emulate dynamic topics, map slots to temporary multicast groups (e.g., `239.255.1.<slot_id>` for slot-specific topics beyond the static `MAX_TOPICS`).
+* Keep it minimal: No slot timeouts or complex scheduling, just first-come-first-serve allocation.
+* Each slot assignment creates a new topic for the assigned node, allowing fine-grained communication.
+* Clients join the multicast group for their assigned slot to receive messages.
+
+Minimalistic Deduplication
+--------------------------
+
+* Use a fixed-size circular buffer (`seq_cache`) in `ServerState` to store recent `(node_id, seq_no)` pairs.
+* Hash `(node_id, seq_no)` to an index using FNV1a, checking for duplicates in O(1) time.
+* If a message’s `(node_id, seq_no)` matches a cached entry, discard it as a duplicate.
+* Minimal memory: `SEQ_CACHE_SIZE=1024` entries (~8KB for `node_id`, `seq_no`, `timestamp`).
+
 Subscriptions
 -------------
 
