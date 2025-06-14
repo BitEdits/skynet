@@ -455,28 +455,25 @@ void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uin
 
     if (is_duplicate(state, msg->node_id, msg->seq_no, msg->type, addr)) { return; }
 
-    if (msg->type == SKYNET_MSG_KEY_EXCHANGE && msg->npg_id == SKYNET_NPG_CONTROL) {
-
-        to = (msg->npg_id == SKYNET_NPG_CONTROL ? 0x40ac3dd2 : topic_hash);
-
-    }
+         if (msg->npg_id == SKYNET_NPG_CONTROL) { to = 0x40ac3dd2; }
+                                           else { to = topic_hash; }
 
     if (skynet_decrypt(1, msg, to, msg->node_id) < 0) {
         fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
         return;
     }
 
-    hex_dump("SKY HEX DUMP", (const uint8_t *)msg, 309);
+    hex_dump("SKY HEX DUMP", (const uint8_t *)msg, msg->payload_len);
 
     switch (msg->type) {
         case SKYNET_MSG_PUBLIC:
         case SKYNET_MSG_CHAT:
         case SKYNET_MSG_ACK:
         case SKYNET_MSG_WAYPOINT:
-        case SKYNET_MSG_STATUS:
         case SKYNET_MSG_FORMATION:
              send_to_npg(state, msg, recv_time);
              break;
+        case SKYNET_MSG_STATUS:
         case SKYNET_MSG_KEY_EXCHANGE:
         case SKYNET_MSG_SLOT_REQUEST:
              process_control(state, node, msg, recv_time, addr);
@@ -511,7 +508,6 @@ void *worker_thread(void *arg) {
             struct sockaddr_in addr;
             uint64_t recv_time;
             while (queue_dequeue(state, &msg, &addr, &recv_time) == 0) {
-
 
                 NodeState *node = NULL;
                 if (msg.type == SKYNET_MSG_KEY_EXCHANGE) {
