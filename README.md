@@ -231,7 +231,7 @@ Encrypts a test message from `<sender>` to `<recipient>` for the specified NPG, 
 
 Decrypts `<file>` (e.g., `<npg_id>.sky`) using keys for `<sender>` and `<recipient>`.
 
-#### `skynet server <node>`
+#### `skynet <node>`
 
 Runs the server named as `<node>`, FNV1A 32-bit hash is used.
 The server assigns a slot, forwards status messages to `239.255.1.<slot_id>`, and logs all activity.
