@@ -7,7 +7,7 @@ Properties
 ----------
 
 * C99 Implementation
-* 32 bytes Minimal Message (including IV)
+* 32 bytes Minimal Message (48 with IV)
 * ECC DH Key Exchange
 * Microseconds-precise Latency
 * Non-Blocking Atomic Primitives
@@ -120,17 +120,17 @@ S-Message
 Skynet message format is designed for swarms of thousands.
 
 ```
-typedef struct  __attribute__((packed)) {
-    uint8_t version : 4;         // 1/2 byte
-    uint8_t type : 4;            // 1/2 byte
-    uint8_t qos : 4;             // 1/2 byte
-    uint8_t hop_count : 4;       // 1/2 byte
-    uint32_t npg_id;             // 4   bytes
-    uint32_t node_id;            // 4   bytes
-    uint32_t seq_no;             // 4   bytes
-    uint8_t iv[16];              // 16  bytes
-    uint16_t payload_len;        // 2   bytes
-    uint8_t payload[MAX_BUFFER]; // Variable
+typedef struct {
+    uint8_t version : 4;
+    uint8_t type : 4;
+    uint8_t qos : 4;
+    uint8_t hop_count : 4;
+    uint32_t npg_id;
+    uint32_t node_id;
+    uint32_t seq_no;
+    uint8_t iv[16];
+    uint16_t payload_len;
+    uint8_t payload[MAX_BUFFER];
 } SkyNetMessage;
 ```
 

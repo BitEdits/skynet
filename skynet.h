@@ -92,7 +92,7 @@ typedef enum {
     NODE_ROLE_SPACE_VEHICLE
 } NodeRole;
 
-typedef struct  __attribute__((packed)) {
+typedef struct {
     uint8_t version : 4;         // 1/2 byte
     uint8_t type : 4;            // 1/2 byte
     uint8_t qos : 4;             // 1/2 byte
