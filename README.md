@@ -216,13 +216,6 @@ Sent status message: pos=[0.1, 0.1, 0.1], vel=[0.0, 0.0, 0.0], seq=2, multicast=
 
 ### Usage
 
-1. Run the server: `./skynet server`
-2. Run the client: `./skynet_client client`
-3. The client sends key exchange, slot request, and status messages.
-4. The server assigns a slot, forwards status messages to `239.255.1.<slot_id>`, and logs all activity.
-
-### Utilities
-
 #### `skynet_keygen <node> [--server|--client]`
 
 Generates ECC secp384r1 key pairs for the specified node,
@@ -235,6 +228,16 @@ Encrypts a test message from `<sender>` to `<recipient>` for the specified NPG, 
 #### `skynet_decrypt <sender> <recipient> <file.sky>`
 
 Decrypts `<file>` (e.g., `<npg_id>.sky`) using keys for `<sender>` and `<recipient>`.
+
+#### `./skynet server <node>`
+
+Runs the server named as `<node>`, FNV1A 32-bit hash is used.
+The server assigns a slot, forwards status messages to `239.255.1.<slot_id>`, and logs all activity.
+
+#### `./skynet_client <node>`
+
+Runs the client named as `<node>`, FNV1A 32-bit hash is used.
+The client sends key exchange, slot request, and status messages.
 
 ### Limitations
 
