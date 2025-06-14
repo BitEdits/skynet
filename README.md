@@ -118,19 +118,17 @@ S-Message
 Skynet message format is designed for swarms of thousands.
 
 ```
-typedef struct {
-    uint8_t version;       // 1  1,...
-    uint8_t type;          // 1  0=key, 1=slot, 2=chat, 3=ack, 4=waypoint, 5=status, 6=formation
-    uint32_t npg_id;       // 4  NPG/swarm_id (1–1000)
-    uint32_t node_id;      // 4  Unique node ID
-    uint32_t seq_no;       // 4  Deduplication
-    uint64_t timestamp;    // 8  Relative time (us)
-    uint8_t qos;           // 1  0=chat, 1=PLI, 2=voice, 3=swarm_cmd
-    uint8_t hop_count;     // 1  0–3
-    uint8_t iv[16];        // 16 AES-256-GCM IV
-    uint8_t hmac[32];      // 32 HMAC-SHA256
-    uint16_t payload_len;  // 2  0–1590 bytes
-    uint8_t payload[1590]; // 0  Encrypted Payload
+typedef struct  __attribute__((packed)) {
+    uint8_t version : 4;         // 1/2 byte
+    uint8_t type : 4;            // 1/2 byte
+    uint8_t qos : 4;             // 1/2 byte
+    uint8_t hop_count : 4;       // 1/2 byte
+    uint32_t npg_id;             // 4   bytes
+    uint32_t node_id;            // 4   bytes
+    uint32_t seq_no;             // 4   bytes
+    uint8_t iv[16];              // 16  bytes
+    uint16_t payload_len;        // 2   bytes
+    uint8_t payload[MAX_BUFFER]; // Variable
 } SkyNetMessage;
 ```
 
