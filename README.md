@@ -26,8 +26,8 @@ Skynet is the reference server implementing Link32 tactical battlefield protocol
 * Node Identification: Node names are hashed to 32-bit using FNV-1a for compact addressing.
 * Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap (CMPXCHG) for concurrency.
 * Topic Architecture: Topics map to IP multicast groups, enabling scalable publish-subscribe communication.
-* Queue Management: Global network queue for incoming messages, with per-topic subscriber queues for efficient distribution.
-* Key Storage: Separate key stores per executable (~/.skynet/ for server, ~/.skynet_client/ for client) to isolate credentials.
+* Queue Management: Global network queue for incoming messages with per-topic subscriber queues.
+* Key Storage: Separate key stores per executable.
 
 ## Link32 Protocol
 
