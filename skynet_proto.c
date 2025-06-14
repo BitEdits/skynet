@@ -64,7 +64,7 @@ EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private) {
     char *key_path = build_key_path(srv, node_name, is_private ? ".ec_priv" : ".ec_pub");
     if (!key_path) return NULL;
 
-//    fprintf(stderr, "%sDebug: Accessing keystore: %s.%s\n", GRAY, key_path, RESET);
+//  fprintf(stderr, "%sDebug: Accessing keystore: %s.%s\n", GRAY, key_path, RESET);
 
     FILE *key_file = fopen(key_path, "rb");
     if (!key_file) {
@@ -234,7 +234,6 @@ void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, u
         print_openssl_error();
     }
 }
-
 
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size) {
     if (!msg || !buffer) {
@@ -417,12 +416,6 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     return 0;
 }
 
-int load_private(int srv, const char *node_name, EVP_PKEY **ec_key) {
-    *ec_key = load_ec_key(srv, node_name, 1);
-    if (!*ec_key) return -1;
-    return 0;
-}
-
 uint32_t fnv1a_32(const void *data, size_t len) {
     const uint8_t *bytes = (const uint8_t *)data;
     uint32_t hash = FNV_OFFSET_BASIS_32;
@@ -469,4 +462,3 @@ void hex_dump(const char *label, const uint8_t *data, size_t len) {
     for (size_t i = 0; i < len; i++) { fprintf(stderr, "%02x ", data[i]); if (i % 32 == 31) fprintf(stderr, "\n"); }
     if (len % 32 != 0) fprintf(stderr, "\n");
 }
-

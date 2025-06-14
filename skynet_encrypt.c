@@ -79,7 +79,7 @@ uint8_t *read_payload_file(const char *filename, size_t *payload_len) {
 }
 
 int main(int argc, char *argv[]) {
-    srand(time(NULL)); /* Seed rand() for compatibility */
+    srand(time(NULL));
     if (argc != 4) {
         fprintf(stderr, "Usage: %s <from_node_name> <to_node_name> <payload_file_name>\n", argv[0]);
         return 1;

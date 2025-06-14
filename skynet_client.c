@@ -42,11 +42,7 @@ int main(int argc, char *argv[]) {
 
     printf("%sNode %x connecting to port %u.%s\n", CYAN, node_id, PORT, RESET);
 
-    EVP_PKEY *ec_key = NULL;
-    if (load_private(0, node_name, &ec_key) < 0) {
-        fprintf(stderr, "Failed to load client private key\n");
-        return 1;
-    }
+    EVP_PKEY *ec_key = load_ec_key(0, node_name, 1);
 
     const char *topics[] = { "npg_control", "npg_pli", "npg_surveillance", "npg_chat",
                              "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};

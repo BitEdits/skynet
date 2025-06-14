@@ -8,7 +8,6 @@
 #define CLIENT_BASE_PATH "~/.skynet_client/ecc/secp384r1/"
 
 #define AES_KEY_LEN 32
-#define HMAC_KEY_LEN 32
 #define MAX_NODE_NAME 64
 #define MAX_BUFFER 1590
 
@@ -25,7 +24,6 @@
 #define SKYNET_QOS_VOICE 2
 #define SKYNET_QOS_C2 3
 #define SKYNET_MAX_HOPS 5
-
 #define SKYNET_NPG_CONTROL 1
 #define SKYNET_NPG_PLI 6
 #define SKYNET_NPG_SURVEILLANCE 7

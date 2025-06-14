@@ -155,10 +155,7 @@ void server_init(ServerState *state, const char *node_name) {
     strncpy(state->server_name, node_name, MAX_NODE_NAME - 1);
     state->server_name[MAX_NODE_NAME - 1] = '\0';
 
-    if (load_private(1, node_name, &state->ec_key)) {
-        fprintf(stderr, "Failed to load server private key\n");
-        exit(1);
-    }
+    state->ec_key = load_ec_key(1, node_name, 1);
 
     const char *topics[] = { "npg_control", "npg_pli", "npg_surveillance",
                              "npg_chat", "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
@@ -200,7 +197,7 @@ int is_duplicate(ServerState *state, uint32_t node_id, uint32_t seq_no, uint8_t 
         if (atomic_load(&state->seqs[idx].claimed)) {
             if (state->seqs[idx].node_id == node_id && state->seqs[idx].seq_no == seq_no) {
                 if (current_time - state->seqs[idx].timestamp < 2) {
-//                    printf("[%s] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n", time_str, node_id, type, seq_no, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+//                  printf("[%s] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n", time_str, node_id, type, seq_no, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
                     return 1;
                 }
             }
