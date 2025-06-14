@@ -22,6 +22,8 @@ Properties
 Install
 -------
 
+The system should be able to deploy with one script `skynet.sh` having mounted key stores of all network allowed devices.
+
 ```
 $ git clone git@github.com:BitEdits/skynet
 $ cd skynet
@@ -43,6 +45,8 @@ $ ./skynet_client client
 
 Skynet
 ------
+
+Server:
 
 ```
 $ ./skynet server
@@ -76,6 +80,8 @@ Encryption successful, from=8f929c1e, to=1, size=34.
 Message received, from=8f929c1e, to=6, size=40.
 Messsage sent from=8f929c1e, to=1, seq=3, multicast=239.255.0.1, latency=10248.
 ```
+
+Client:
 
 ```
 $ ./skynet_client client
