@@ -13,7 +13,7 @@ Properties
 * Non-Blocking Atomic Primitives
 * Multicore Processing
 * AES-256-GCM Encryption
-* Topics on Multicast
+* Multicast Topics
 * UDP Interface
 * Single dependency (OpenSSL, replaceable)
 * Threat model doesn't require non-repudiation (HMAC)
