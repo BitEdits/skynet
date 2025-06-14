@@ -1,7 +1,7 @@
-Skynet
+Link32
 ======
 
-Skynet is a VMF/LINK16/TSM/SRW/MQTT inspired tactical protocol for military appliances.
+Link32 is a VMF/LINK16/TSM/SRW/MQTT inspired tactical protocol for military appliances.
 
 Properties
 ----------
