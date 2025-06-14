@@ -147,9 +147,6 @@ typedef struct {
 
 ### Multicast Topics
 
-Topics are mapped to IP multicast groups (`239.255.0.<npg_id>`) for static topics
-and `239.255.1.<slot_id>` for dynamic slot-based topics. Each topic (NPG) serves a specific role:
-
 | NPG ID | Name | Multicast Group | Purpose |
 |--------|------|-----------------|---------|
 | 1 | npg_control | 239.255.0.1 | Handles key exchange (type 0) and slot requests (type 1) for network control. |
@@ -166,36 +163,39 @@ and `239.255.1.<slot_id>` for dynamic slot-based topics. Each topic (NPG) serves
 
 Link32 uses a minimalistic Time Division Multiple Access (TDMA)-like slot manager to reduce message collisions and emulate dynamic topics:
 
-- **Slot Array**: The server maintains a fixed-size array (`slots[SLOT_COUNT=256]`) in `ServerState`, where each slot is either free (0) or assigned to a `node_id`.
-- **Assignment Process**:
-  1. Clients send a `SKYNET_MSG_SLOT_REQUEST` (type 1) with their `node_id` to `239.255.0.1` (NPG 1).
-  2. The server assigns the first free slot using `assign_slot` and responds with a `SKYNET_MSG_ACK` (type 3) containing the slot ID (4-byte payload).
-  3. The client joins the slot’s multicast group (`239.255.1.<slot_id % 256>`) and sends messages to it.
-- **Dynamic Topics**: Each assigned slot creates a temporary multicast group for node-specific communication, extending the static topic set (`MAX_TOPICS=8`).
-- **Allocation Policy**: First-come, first-serve with no timeouts or reallocation to minimize complexity.
-- **Timing**: Slots cycle every `TIME_SLOT_INTERVAL_US=1000µs`, synchronized via a timerfd in the server.
+* Slot Array: The server maintains a fixed-size array (`slots[SLOT_COUNT=256]`) in `ServerState`, where each slot is either free (0) or assigned to a `node_id`.
+* Dynamic Topics: Each assigned slot creates a temporary multicast group for node-specific communication, extending the static topic set (`MAX_TOPICS=8`).
+* Allocation Policy: First-come, first-serve with no timeouts or reallocation to minimize complexity.
+* Timing: Slots cycle every `TIME_SLOT_INTERVAL_US=1000µs`, synchronized via a timerfd in the server.
+
+Implementation details:
+
+* Clients send a `SKYNET_MSG_SLOT_REQUEST` (type 1) with their `node_id` to `239.255.0.1` (NPG 1).
+* The server assigns the first free slot using `assign_slot` and responds with a `SKYNET_MSG_ACK` (type 3) containing the slot ID (4-byte payload).
+* The client joins the slot’s multicast group (`239.255.1.<slot_id % 256>`) and sends messages to it.
 
 ### Deduplication
 
 To prevent message loops and duplicates, the server uses a fixed-size circular buffer (`seq_cache[SEQ_CACHE_SIZE=1024]`) for deduplication:
 
-- **Structure**: Each entry stores `{node_id, seq_no, timestamp}`.
-- **Operation**:
-  1. Incoming messages are hashed (`node_id ^ seq_no` via FNV-1a) to an index in `seq_cache`.
-  2. If the entry matches and the timestamp is recent (<1s), the message is discarded as a duplicate.
-  3. Otherwise, the entry is updated with the new message’s details.
-- **Memory**: ~8KB (1024 × 8 bytes per entry).
-- **Complexity**: O(1) lookup and update using FNV-1a hashing.
+* Structure: Each entry stores `{node_id, seq_no, timestamp}`.
+* Memory: ~8KB (1024 × 8 bytes per entry).
+* Complexity: O(1) lookup and update using FNV-1a hashing.
+
+Implementation details:
+
+* Incoming messages are hashed (`node_id ^ seq_no` via FNV-1a) to an index in `seq_cache`.
+* If the entry matches and the timestamp is recent (<1s), the message is discarded as a duplicate.
+* Otherwise, the entry is updated with the new message’s details.
 
 ### Security
 
-- **Key Exchange**: ECDH over secp384r1 generates 256-bit AES keys for each session. Public keys are exchanged via `SKYNET_MSG_KEY_EXCHANGE` and stored in `~/.skynet{,_client}/ecc/secp384r1/<node_hash>.ec_{pub,priv}`.
-- **Encryption**: All payloads are encrypted with AES-256-GCM, using a 16-byte random IV and appending a 16-byte authentication tag.
-- **Key Storage**:
-  - Server: Private keys in `~/.skynet/ecc/secp384r1/<node_hash>.ec_priv`, public keys in `<node_hash>.ec_pub`.
-  - Client: Private key in `~/.skynet_client/ecc/secp384r1/<node_hash>.ec_priv`, server/topics’ public keys in `<hash>.ec_pub`.
-- **Key Derivation**: Uses HKDF-SHA256 to derive AES keys from ECDH shared secrets.
-- **Self-Sent Message Handling**: The server skips processing messages where `msg->node_id == state->node_id` to prevent decryption errors and loops.
+* Key Exchange: ECDH over secp384r1 generates 256-bit AES keys for each session.
+* Encryption: All payloads are encrypted with AES-256-GCM, using a 16-byte random IV and appending a 16-byte authentication tag.
+* Server Key Storage: `~/.skynet/ecc/secp384r1/<node_hash>.{ec_priv,ec_pub}`.
+* Client Key Storage: `~/.skynet_client/ecc/secp384r1/<node_hash>.{ec_priv,ec_pub}`
+* Key Derivation: Uses HKDF-SHA256 to derive AES keys from ECDH shared secrets.
+* Self-Sent Message Handling: The server skips processing messages where `msg->node_id == state->node_id` to prevent decryption errors and loops.
 
 ### Subscriptions
 
@@ -222,15 +222,15 @@ $ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
 
 1. Run the server: `./skynet server`
 2. Run the client: `./skynet_client client`
-3. The client sends key exchange, slot request, and status messages (limited to 10 by default).
+3. The client sends key exchange, slot request, and status messages.
 4. The server assigns a slot, forwards status messages to `239.255.1.<slot_id>`, and logs all activity.
 
 ## Limitations
 
-- Slot Scalability: Fixed `SLOT_COUNT=256` limits dynamic topics to 256 nodes.
-- No Retransmission: Messages dropped due to network errors are not retransmitted (aligned with QoS settings).
-- Key Management: Manual public key copying required; no automated key distribution.
-- Deduplication: `SEQ_CACHE_SIZE=1024` may lead to cache collisions in high-traffic scenarios.
+* Slot Scalability: Fixed `SLOT_COUNT=256` limits dynamic topics to 256 nodes.
+* No Retransmission: Messages dropped due to network errors are not retransmitted (aligned with QoS settings).
+* Key Management: Manual public key copying required; no automated key distribution.
+* Deduplication: `SEQ_CACHE_SIZE=1024` may lead to cache collisions in high-traffic scenarios.
 
 ## Author
 
