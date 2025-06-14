@@ -29,6 +29,7 @@ Principles
 * Topics using IP multicast
 * Multicore Processing from Global Network Queue
 * Subscribers Queue per Topic
+* Key Store per Executable
 
 Install
 -------
