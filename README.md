@@ -98,7 +98,7 @@ Implementation details:
 
 ### Deduplication
 
-To prevent message loops and duplicates, the server uses a fixed-size circular buffer (`seq_cache[SEQ_CACHE_SIZE=1024]`) for deduplication:
+To prevent message loops and duplicates, the server uses a fixed-size circular buffer `seq_cache` for deduplication:
 
 * Structure: Each entry stores `{node_id, seq_no, timestamp}`.
 * Memory: ~16KB (1024 × 16 bytes per entry: 4 for node_id, 4 for seq_no, 8 for timestamp).
