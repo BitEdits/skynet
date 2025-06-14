@@ -151,14 +151,6 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         return -1;
     }
 
-    OSSL_PARAM hmac_params[] = {
-        OSSL_PARAM_construct_utf8_string("digest", "SHA256", 0),
-        OSSL_PARAM_construct_octet_string("key", shared_secret, secret_len),
-        OSSL_PARAM_construct_octet_string("info", (unsigned char *)"HMAC", 4),
-        OSSL_PARAM_construct_end()
-    };
-
-
     if (EVP_KDF_derive(kdf_ctx, aes_key, AES_KEY_LEN, params) <= 0) {
         print_openssl_error();
         EVP_KDF_CTX_free(kdf_ctx);
