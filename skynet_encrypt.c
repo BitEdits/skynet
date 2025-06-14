@@ -17,7 +17,7 @@
 #include <openssl/params.h>
 #include "skynet.h"
 
-static uint8_t *read_payload_file(const char *filename, size_t *payload_len) {
+uint8_t *read_payload_file(const char *filename, size_t *payload_len) {
     fprintf(stderr, "Debug: Reading payload file %s\n", filename);
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -102,11 +102,13 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    fprintf(stderr, "Debug: Starting encryption: from=%s, to=%s, file=%s\n", from_node_name, to_node_name, payload_file_name);
 
     SkyNetMessage msg;
 
-    skynet_encrypt(0, &msg, from_node_hash, to_node_hash, payload, payload_len);
+    if (skynet_encrypt(0, &msg, from_node_hash, to_node_hash, payload, payload_len) < 0) {
+       fprintf(stderr, "Debug: Failed entrypt message.\n");
+       return 1;
+    }
 
     hex_dump("encrypt", (char *)&msg, 200);
 

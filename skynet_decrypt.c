@@ -16,7 +16,7 @@
 #include <openssl/params.h>
 #include "skynet.h"
 
-static uint8_t *read_encrypted_file(const char *filename, size_t *file_len) {
+uint8_t *read_encrypted_file(const char *filename, size_t *file_len) {
     fprintf(stderr, "Debug: Reading encrypted file %s\n", filename);
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -105,7 +105,10 @@ int main(int argc, char *argv[]) {
     }
     free(encrypted_data);
 
-    skynet_decrypt(1, &msg, to_node_hash, from_node_hash);
+    if (skynet_decrypt(1, &msg, to_node_hash, from_node_hash) < 0) {
+       fprintf(stderr, "Failed decrypt message.\n");
+       return 1;
+    }
 
     hex_dump("decrypt", (char *)&msg, 200);
 

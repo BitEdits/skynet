@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     uint32_t node_id = fnv1a_32(argname, strlen(argname));
     snprintf(node_name, sizeof(node_name), "%08x", node_id);
 
-    printf("Client: %s (hash: %x)\n", argname, node_id);
+    printf("%sNode %x connecting to port %u.%s\n", CYAN, node_id, PORT, RESET);
 
     EVP_PKEY *ec_key = NULL;
     if (load_private(0, node_name, &ec_key) < 0) {
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
         if (setsockopt(sock_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
             fprintf(stderr, "Failed to join multicast group %s: %s\n", mcast_ip, strerror(errno));
         } else {
-            printf("Joined multicast group %s (NPG %d)\n", mcast_ip, npgs[i]);
+            printf("%sJoined multicast group %s (NPG %d).%s\n", CYAN, mcast_ip, npgs[i], RESET);
         }
     }
 
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
-    printf("Sent key exchange message to server\n");
+    printf("%sSent key exchange message to server.%s\n", YELLOW, RESET);
 
     // Request slot
     SkyNetMessage slot_msg;
@@ -212,7 +212,8 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(topic_pub_keys[i]);
         return 1;
     }
-    printf("Sent slot request message to server\n");
+
+    printf("%sSent slot request message to server.%s\n", YELLOW, RESET);
 
     // Main loop
     uint32_t message_count = 0;
@@ -258,8 +259,10 @@ int main(int argc, char *argv[]) {
                 }
                 continue;
             }
-            printf("Sent status message: pos=[%.1f, %.1f, %.1f], vel=[%.1f, %.1f, %.1f], seq=%u\n",
-                   position[0], position[1], position[2], velocity[0], velocity[1], velocity[2], status_msg.seq_no);
+
+            printf("%sSent status message: pos=[%.1f, %.1f, %.1f], vel=[%.1f, %.1f, %.1f], seq=%u.%s\n",
+                YELLOW, position[0], position[1], position[2], velocity[0], velocity[1], velocity[2], status_msg.seq_no, RESET);
+
             message_count++;
 
             // Simulate position and velocity updates

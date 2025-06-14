@@ -64,7 +64,7 @@ EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private) {
     char *key_path = build_key_path(srv, node_name, is_private ? ".ec_priv" : ".ec_pub");
     if (!key_path) return NULL;
 
-    fprintf(stderr, "Debug: Accessing keystore: %s\n", key_path);
+//    fprintf(stderr, "%sDebug: Accessing keystore: %s.%s\n", GRAY, key_path, RESET);
 
     FILE *key_file = fopen(key_path, "rb");
     if (!key_file) {
@@ -188,7 +188,6 @@ uint8_t *prepare_auth_data(const SkyNetMessage *msg, uint32_t *data_len) {
 }
 
 int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len) {
-    fprintf(stderr, "Debug: Starting encryption on %s: from=%x, to=%x, size=%d\n", srv == 0 ? "client" : "server", from_node, to_node, data_len);
 
     if (data_len > MAX_BUFFER - 16) {
         fprintf(stderr, "Error: Payload too large: %u > %u\n", data_len, MAX_BUFFER - 16);
@@ -217,12 +216,10 @@ int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_
         return -1;
     }
 
-    fprintf(stderr, "Debug: Encryption done OK\n");
     return 0;
 }
 
 int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_node) {
-    fprintf(stderr, "Debug: Starting decryption on %s: from=%x, to=%x, size=%d\n", srv == 0 ? "client" : "server", from_node, to_node, msg->payload_len);
 
     if (!msg || !to_node || !from_node) {
         fprintf(stderr, "Error: Null pointer in skynet_decrypt\n");
@@ -253,7 +250,6 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
         return -1;
     }
 
-    fprintf(stderr, "Debug: Decryption done OK\n");
     return 0;
 }
 
@@ -328,7 +324,7 @@ void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_leng
     }
     msg->payload_len += 16;
     EVP_CIPHER_CTX_free(ctx);
-
+    fprintf(stderr, "%sEncryption successful, from=%x, to=%x, size=%u.%s\n", YELLOW, msg->node_id, msg->npg_id, msg->payload_len, RESET);
 }
 
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size) {
@@ -399,10 +395,10 @@ int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_
 }
 
 void skynet_print(const SkyNetMessage *msg) {
-    printf("SkyNetMessage: version=%u, type=%u, npg_id=%u, node_id=%x, "
-           "seq_no=%u, qos=%u, hop=%u, payload_len=%u\n",
+    printf("%sSkyNetMessage: version=%u, type=%u, npg_id=%u, node_id=%x, "
+           "seq_no=%u, qos=%u, hop=%u, payload_len=%u%s\n", BLUE,
            msg->version, msg->type, msg->npg_id, msg->node_id,
-           msg->seq_no, msg->qos, msg->hop_count, msg->payload_len);
+           msg->seq_no, msg->qos, msg->hop_count, msg->payload_len, RESET);
 }
 
 int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
@@ -449,7 +445,7 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     memcpy(msg->payload, outbuf, outlen + finallen);
     msg->payload_len = outlen + finallen;
     EVP_CIPHER_CTX_free(ctx);
-    fprintf(stderr, "Debug: Decryption successful, plaintext_len=%u\n", msg->payload_len);
+    fprintf(stderr, "%sDecryption successful, from=%x, to=%x, size=%u.%s\n", YELLOW, msg->node_id, msg->npg_id, msg->payload_len, RESET);
     return 0;
 }
 
@@ -496,7 +492,7 @@ int set_non_blocking(int fd) {
 
 uint64_t get_time_us(void) {
     struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
+    clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
 }
 

@@ -201,8 +201,7 @@ int is_duplicate(ServerState *state, uint32_t node_id, uint32_t seq_no, uint8_t 
         if (atomic_load(&state->seqs[idx].claimed)) {
             if (state->seqs[idx].node_id == node_id && state->seqs[idx].seq_no == seq_no) {
                 if (current_time - state->seqs[idx].timestamp < 2) {
-                    printf("[%s] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n",
-                           time_str, node_id, type, seq_no, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+//                    printf("[%s] Dropped duplicate message from node %u, type=%d, seq=%u, src=%s:%d\n", time_str, node_id, type, seq_no, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
                     return 1;
                 }
             }
@@ -250,7 +249,7 @@ NodeState *find_or_add_node(ServerState *state, struct sockaddr_in *addr, uint32
         node->last_seen = get_time_us();
         strncpy(node->node_name, node_name, MAX_NODE_NAME - 1);
         node->node_name[MAX_NODE_NAME - 1] = '\0';
-        printf("Node %u (%s) added from %s:%d\n", node_id, node->node_name, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port));
+        printf("%sNode %x added from %s:%d.%s\n", CYAN, node_id, inet_ntoa(addr->sin_addr), ntohs(addr->sin_port), RESET);
         if (new_count == 1 && !atomic_load(&state->timer_active)) {
             struct itimerspec timer_spec = {
                 .it_interval = { .tv_sec = 0, .tv_nsec = TIME_SLOT_INTERVAL_US * 1000 },
@@ -271,7 +270,7 @@ void subscribe_npg(NodeState *node, uint8_t npg_id) {
     for (int i = 0; i < 32; i++) {
         if (node->subscribed_npgs[i] == 0 || node->subscribed_npgs[i] == npg_id) {
             node->subscribed_npgs[i] = npg_id;
-            printf("Node %u subscribed to NPG %d\n", node->node_id, npg_id);
+            printf("%sNode %x subscribed to NPG %d.%s\n", CYAN, node->node_id, npg_id, RESET);
             break;
         }
     }
@@ -318,8 +317,8 @@ void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_tim
             perror("sendto failed");
         }
     } else {
-        printf("SENT [NPG:%d][seq:%u][multicast:%s] latency [us:%lu]\n",
-               msg->npg_id, msg->seq_no, mcast_ip, send_time - recv_time);
+        printf("%sMesssage sent from=%x, to=%x, seq=%u, multicast=%s, latency=%lu.%s\n", YELLOW,
+               msg->node_id, msg->npg_id, msg->seq_no, mcast_ip, send_time - recv_time, RESET);
         record_sequence(state, msg->node_id, msg->seq_no);
     }
 }
@@ -336,9 +335,9 @@ void process_control(ServerState *state, NodeState *node, SkyNetMessage *msg, ui
             memcpy(node->position, msg->payload, sizeof(float) * 3);
             memcpy(node->velocity, msg->payload + 3 * sizeof(float), sizeof(float) * 3);
             node->last_seen = get_time_us();
-            printf("Updated PLI for node %u: pos=[%.1f, %.1f, %.1f], vel=[%.1f, %.1f, %.1f]\n",
+            printf("%sUpdated PLI for node %u: pos=[%.1f, %.1f, %.1f], vel=[%.1f, %.1f, %.1f].%s\n", CYAN,
                    node->node_id, node->position[0], node->position[1], node->position[2],
-                   node->velocity[0], node->velocity[1], node->velocity[2]);
+                   node->velocity[0], node->velocity[1], node->velocity[2], RESET);
         }
     } else if (msg->type == SKYNET_MSG_KEY_EXCHANGE) {
         if (msg->payload_len < 2 || msg->payload_len > MAX_BUFFER - 1) {
@@ -354,7 +353,7 @@ void process_control(ServerState *state, NodeState *node, SkyNetMessage *msg, ui
             return;
         }
         if (save_public_key(1, client_name, msg->payload, msg->payload_len) == 0) {
-            printf("Saved public key for client %s\n", client_name);
+            printf("%sSaved public key for client %s.%s\n", CYAN, client_name, RESET);
             SkyNetMessage response;
             skynet_init(&response, 0x40ac3dd2, msg->node_id, SKYNET_NPG_CONTROL, SKYNET_QOS_C2);
             response.seq_no = state->current_slot;
@@ -392,7 +391,7 @@ void process_self_healing(ServerState *state) {
     uint64_t now = get_time_us();
     for (size_t i = 0; i < atomic_load(&state->node_count); i++) {
         if (now - state->nodes[i].last_seen > NEIGHBOR_TIMEOUT_US) {
-            printf("Node %u (%s) timed out, removing\n", state->nodes[i].node_id, state->nodes[i].node_name);
+            printf("%sNode %x timed out, removing.%s\n", CYAN, state->nodes[i].node_id, RESET);
             for (size_t j = i; j < atomic_load(&state->node_count) - 1; j++) {
                 state->nodes[j] = state->nodes[j + 1];
             }
@@ -416,15 +415,10 @@ void process_self_healing(ServerState *state) {
 void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
 
     uint8_t aes_key[32], hmac_key[32];
-
     node->last_seen = get_time_us();
 
-    if (msg->version != SKYNET_VERSION) {
-        fprintf(stderr, "Invalid version %d from node %u\n", msg->version, msg->node_id);
-        return;
-    }
 
-    skynet_print(msg);
+    fprintf(stderr, "%sMessage received, from=%x, to=%x, size=%u.%s\n", YELLOW, msg->node_id, msg->npg_id, msg->payload_len, RESET);
 
     const char *topic = NULL;
     switch (msg->npg_id) {
@@ -441,6 +435,7 @@ void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uin
             return;
     }
 
+    uint32_t server_hash = fnv1a_32("server", strlen("server"));
     uint32_t topic_hash = fnv1a_32(topic, strlen(topic));
     uint32_t to = msg->npg_id;
     uint32_t from = msg->node_id;
@@ -455,15 +450,15 @@ void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uin
 
     if (is_duplicate(state, msg->node_id, msg->seq_no, msg->type, addr)) { return; }
 
-         if (msg->npg_id == SKYNET_NPG_CONTROL) { to = 0x40ac3dd2; }
-                                           else { to = topic_hash; }
+    to = (msg->npg_id == SKYNET_NPG_CONTROL) ? server_hash : topic_hash;
 
     if (skynet_decrypt(1, msg, to, msg->node_id) < 0) {
+        fprintf(stderr, "%s", MAGENTA);
         fprintf(stderr, "Decryption failed (from=%u, to=%u, seq=%u)\n", msg->node_id, to, msg->seq_no);
+        hex_dump("SKY HEX DUMP", (const uint8_t *)msg, msg->payload_len);
+        fprintf(stderr, "%s", RESET);
         return;
     }
-
-    hex_dump("SKY HEX DUMP", (const uint8_t *)msg, msg->payload_len);
 
     switch (msg->type) {
         case SKYNET_MSG_PUBLIC:
@@ -472,7 +467,7 @@ void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uin
         case SKYNET_MSG_WAYPOINT:
         case SKYNET_MSG_FORMATION:
         case SKYNET_MSG_STATUS:
-             msg->node_id = 0x40ac3dd2;
+             msg->node_id = server_hash;
              send_to_npg(state, msg, recv_time);
              break;
         case SKYNET_MSG_KEY_EXCHANGE:
@@ -531,7 +526,7 @@ void *worker_thread(void *arg) {
                 }
 
                 if (node) { handle_message(state, node, &msg, recv_time, &addr); }
-                     else { fprintf(stderr, "No node found for ID %u\n", msg.node_id); }
+                     else { fprintf(stderr, "%sNo node found for id=%u.%s\n", CYAN, msg.node_id, RESET); }
             }
         }
     }
@@ -555,8 +550,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Node name too long (max %d)\n", MAX_NODE_NAME - 1);
         return 1;
     }
-
-    printf("Node name: %s\n", node_name);
 
     ServerState state;
     server_init(&state, node_name);
@@ -600,7 +593,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < 8; i++) EVP_PKEY_free(state.topic_priv_keys[i]);
         return 1;
     }
-    printf("SkyNet server bound to %s:%d\n", inet_ntoa(state.server_addr.sin_addr), ntohs(state.server_addr.sin_port));
+    printf("%sNode %s bound to %s:%d.%s\n", CYAN, node_name, inet_ntoa(state.server_addr.sin_addr), ntohs(state.server_addr.sin_port), RESET);
 
     uint8_t npgs[] = { SKYNET_NPG_CONTROL, SKYNET_NPG_PLI, SKYNET_NPG_SURVEILLANCE, SKYNET_NPG_CHAT,
                        SKYNET_NPG_C2, SKYNET_NPG_ALERTS, SKYNET_NPG_LOGISTICS, SKYNET_NPG_COORD };
@@ -613,7 +606,7 @@ int main(int argc, char *argv[]) {
         if (setsockopt(state.socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
             fprintf(stderr, "Failed to join multicast group %s: %s\n", mcast_ip, strerror(errno));
         } else {
-            printf("Joined multicast group %s\n", mcast_ip);
+            printf("%sJoined multicast group %s.%s\n", CYAN, mcast_ip, RESET);
         }
     }
 
@@ -704,8 +697,6 @@ int main(int argc, char *argv[]) {
                 }
 
                 SkyNetMessage msg;
-
-                printf("SERIALIZED LEN: %li\n", len);
 
                 if (skynet_deserialize(&msg, buffer, len) < 0) {
                     fprintf(stderr, "Failed to deserialize message from %s:%d\n",

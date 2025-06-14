@@ -81,7 +81,7 @@ typedef struct {
     int epoll_fd;
 } WorkerState;
 
-static uint64_t get_time_us(void) {
+uint64_t get_time_us(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC_RAW, &ts) == 0) {
         return (uint64_t)ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL;

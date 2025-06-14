@@ -35,6 +35,16 @@
 #define SKYNET_NPG_LOGISTICS 102
 #define SKYNET_NPG_COORD 103
 
+#define GRAY          "\x1b[0;90m"
+#define YELLOW        "\x1b[0;93m"
+#define BLUE          "\x1b[0;34m"
+#define MAGENTA       "\x1b[0;35m"
+#define CYAN          "\x1b[0;36m"
+#define SILVER        "\x1b[0;37m"
+#define BRIGHT_YELLOW "\x1b[0;93m"
+#define BRIGHT_BLUE   "\x1b[0;94m"
+#define RESET         "\x1b[0m"
+
 typedef enum {
     VEHICLE_M1_ABRAMS = 0, VEHICLE_M2_BRADLEY, VEHICLE_M1126_STRYKER, VEHICLE_M113_APC,
     VEHICLE_AMPV, VEHICLE_M10_BOOKER, VEHICLE_TERREX_ICV, VEHICLE_HMMWV, VEHICLE_JLTV,
