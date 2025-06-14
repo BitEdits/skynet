@@ -13,7 +13,7 @@ Skynet is the reference server implementing Link32 tactical battlefield protocol
 * Message Size: Minimum 32-byte header (48 bytes with AES-256-GCM authentication tag) to optimize bandwidth.
 * Security: ECDH key exchange over secp384r1, with AES-256-GCM encryption for all messages.
 * Latency: Microsecond-precision timing using monotonic clocks and non-blocking I/O.
-* Concurrency: Lock-free atomic operations (CMPXCHG) for thread-safe queue management, supporting multicore processing.
+* Concurrency: Lock-free atomic operations (CMPXCHG) for multicore thread-safe queue management.
 * Networking: UDP multicast with topic-based subscriptions, using IP multicast groups (e.g., 239.255.0.<npg_id>).
 * Footprint: ~64KB L1 cache usage, ~2000 lines of code (LOC) for minimal resource consumption.
 * Dependencies: Single dependency on OpenSSL for cryptographic operations.
