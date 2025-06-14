@@ -1,4 +1,4 @@
-# Link32
+# Skynet/Link32
 
 Link32 is a tactical communication protocol inspired by VMF, LINK16, TSM, SRW, and MQTT,
 designed for military applications requiring low-latency, secure, and scalable data
