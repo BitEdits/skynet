@@ -21,9 +21,9 @@ Skynet is the reference server implementing Link32 tactical battlefield protocol
 
 ## Principles
 
-* Automated Key Provisioning: Single script (skynet.sh) generates and distributes ECC key pairs for nodes and topics.
-* Mandatory Encryption: All messages are encrypted with AES-256-GCM; unencrypted transmission is not supported.
-* Node Identification: Node names are hashed to 32-bit identifiers using FNV-1a for compact addressing.
+* Automated Key Provisioning: Single script distributes ECC key pairs for nodes and topics.
+* Mandatory Encryption: All messages are encrypted with AES-256-GCM.
+* Node Identification: Node names are hashed to 32-bit using FNV-1a for compact addressing.
 * Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap (CMPXCHG) for concurrency.
 * Topic Architecture: Topics map to IP multicast groups, enabling scalable publish-subscribe communication.
 * Queue Management: Global network queue for incoming messages, with per-topic subscriber queues for efficient distribution.
