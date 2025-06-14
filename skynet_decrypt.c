@@ -16,7 +16,7 @@
 #include <openssl/params.h>
 #include "skynet.h"
 
-uint8_t *read_encrypted_file(const char *filename, size_t *file_len) {
+uint8_t *read_encrypted_file(char *filename, size_t *file_len) {
     fprintf(stderr, "Debug: Reading encrypted file %s\n", filename);
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
     uint32_t from_node_hash = fnv1a_32(argv[1], strlen(argv[1]));
     uint32_t to_node_hash = fnv1a_32(argv[2], strlen(argv[2]));
 
-    const char *encrypted_file_name = argv[3];
+    char *encrypted_file_name = argv[3];
     size_t file_len;
     uint8_t *encrypted_data = read_encrypted_file(encrypted_file_name, &file_len);
     if (!encrypted_data) {

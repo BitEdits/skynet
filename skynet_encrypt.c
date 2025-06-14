@@ -17,7 +17,7 @@
 #include <openssl/params.h>
 #include "skynet.h"
 
-uint8_t *read_payload_file(const char *filename, size_t *payload_len) {
+uint8_t *read_payload_file(char *filename, size_t *payload_len) {
     fprintf(stderr, "Debug: Reading payload file %s\n", filename);
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
     snprintf(from_node_name, sizeof(from_node_name), "%08x", from_node_hash);
     snprintf(to_node_name, sizeof(to_node_name), "%08x", to_node_hash);
 
-    const char *payload_file_name = argv[3];
+    char *payload_file_name = argv[3];
     size_t payload_len;
     uint8_t *payload = read_payload_file(payload_file_name, &payload_len);
     if (!payload) {

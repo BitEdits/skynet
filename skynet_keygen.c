@@ -17,7 +17,7 @@
 #include <openssl/core_names.h>
 #include "skynet.h"
 
-int create_dir(const char *path) {
+int create_dir(char *path) {
     char *tmp = strdup(path);
     if (!tmp) return -1;
     for (char *p = tmp + 1; *p; p++) {
@@ -38,8 +38,8 @@ int create_dir(const char *path) {
     return 0;
 }
 
-int generate_keys(const char *node_name, int is_client) {
-    const char *base_path = is_client ? CLIENT_BASE_PATH : SERVER_BASE_PATH;
+int generate_keys(char *node_name, int is_client) {
+    char *base_path = is_client ? CLIENT_BASE_PATH : SERVER_BASE_PATH;
     char *dir_path = expand_home(base_path);
     if (!dir_path) return -1;
 
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const char *node_name = argv[1];
+    char *node_name = argv[1];
     if (strlen(node_name) > MAX_NODE_NAME) {
         fprintf(stderr, "Node name too long (max %d characters)\n", MAX_NODE_NAME);
         return 1;
