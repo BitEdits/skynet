@@ -91,7 +91,7 @@ typedef struct {
     int epoll_fd;
 } WorkerState;
 
-static void queue_init(MessageQueue *q) {
+void queue_init(MessageQueue *q) {
     atomic_store(&q->head, 0);
     atomic_store(&q->tail, 0);
     for (int i = 0; i < THREAD_COUNT; i++) {
@@ -103,7 +103,7 @@ static void queue_init(MessageQueue *q) {
     }
 }
 
-static int queue_enqueue(ServerState *state, const SkyNetMessage *msg, const struct sockaddr_in *addr, uint64_t recv_time) {
+int queue_enqueue(ServerState *state, const SkyNetMessage *msg, const struct sockaddr_in *addr, uint64_t recv_time) {
     MessageQueue *q = &state->mq;
     uint32_t head, next_head;
     do {
@@ -126,7 +126,7 @@ static int queue_enqueue(ServerState *state, const SkyNetMessage *msg, const str
     return 0;
 }
 
-static int queue_dequeue(ServerState *state, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t *recv_time) {
+int queue_dequeue(ServerState *state, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t *recv_time) {
     MessageQueue *q = &state->mq;
     uint32_t tail, next_tail;
     do {
@@ -142,7 +142,7 @@ static int queue_dequeue(ServerState *state, SkyNetMessage *msg, struct sockaddr
     return 0;
 }
 
-static void pin_thread(int core_id) {
+void pin_thread(int core_id) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(core_id % sysconf(_SC_NPROCESSORS_ONLN), &cpuset);
@@ -151,7 +151,7 @@ static void pin_thread(int core_id) {
     }
 }
 
-static void server_init(ServerState *state, const char *node_name) {
+void server_init(ServerState *state, const char *node_name) {
     memset(state, 0, sizeof(ServerState));
     strncpy(state->server_name, node_name, MAX_NODE_NAME - 1);
     state->server_name[MAX_NODE_NAME - 1] = '\0';
@@ -191,7 +191,7 @@ static void server_init(ServerState *state, const char *node_name) {
     state->server_addr.sin_port = htons(PORT);
 }
 
-static int is_duplicate(ServerState *state, uint32_t node_id, uint32_t seq_no, uint8_t type, struct sockaddr_in *addr) {
+int is_duplicate(ServerState *state, uint32_t node_id, uint32_t seq_no, uint8_t type, struct sockaddr_in *addr) {
     uint64_t current_time = time(NULL);
     char time_str[32];
     strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime((time_t *)&current_time));
@@ -211,7 +211,7 @@ static int is_duplicate(ServerState *state, uint32_t node_id, uint32_t seq_no, u
     return 0;
 }
 
-static void record_sequence(ServerState *state, uint32_t node_id, uint32_t seq_no) {
+void record_sequence(ServerState *state, uint32_t node_id, uint32_t seq_no) {
     uint32_t hash = (node_id ^ seq_no) % MAX_SEQUENCES;
     uint32_t idx = atomic_fetch_add(&state->seq_idx, 1) % MAX_SEQUENCES;
     for (int i = 0; i < MAX_SEQUENCES; i++) {
@@ -230,7 +230,7 @@ static void record_sequence(ServerState *state, uint32_t node_id, uint32_t seq_n
     }
 }
 
-static NodeState *find_or_add_node(ServerState *state, struct sockaddr_in *addr, uint32_t node_id, NodeRole role, const char *node_name) {
+NodeState *find_or_add_node(ServerState *state, struct sockaddr_in *addr, uint32_t node_id, NodeRole role, const char *node_name) {
     uint32_t count = atomic_load(&state->node_count);
     for (size_t i = 0; i < count; i++) {
         if (memcmp(&state->nodes[i].addr, addr, sizeof(*addr)) == 0) {
@@ -267,7 +267,7 @@ static NodeState *find_or_add_node(ServerState *state, struct sockaddr_in *addr,
     return find_or_add_node(state, addr, node_id, role, node_name);
 }
 
-static void subscribe_npg(NodeState *node, uint8_t npg_id) {
+void subscribe_npg(NodeState *node, uint8_t npg_id) {
     for (int i = 0; i < 32; i++) {
         if (node->subscribed_npgs[i] == 0 || node->subscribed_npgs[i] == npg_id) {
             node->subscribed_npgs[i] = npg_id;
@@ -277,7 +277,7 @@ static void subscribe_npg(NodeState *node, uint8_t npg_id) {
     }
 }
 
-static void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_time) {
+void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_time) {
     uint64_t send_time = get_time_us();
     uint8_t buffer[MAX_BUFFER];
     const char *topic = NULL;
@@ -324,7 +324,7 @@ static void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t r
     }
 }
 
-static void process_control(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
+void process_control(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
     if (msg->type == SKYNET_MSG_SLOT_REQUEST) {
         subscribe_npg(node, msg->npg_id);
         if (node->role == NODE_ROLE_DRONE && msg->npg_id == SKYNET_NPG_CONTROL) {
@@ -388,7 +388,7 @@ static void process_control(ServerState *state, NodeState *node, SkyNetMessage *
     }
 }
 
-static void process_self_healing(ServerState *state) {
+void process_self_healing(ServerState *state) {
     uint64_t now = get_time_us();
     for (size_t i = 0; i < atomic_load(&state->node_count); i++) {
         if (now - state->nodes[i].last_seen > NEIGHBOR_TIMEOUT_US) {
@@ -413,7 +413,7 @@ static void process_self_healing(ServerState *state) {
     }
 }
 
-static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
+void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uint64_t recv_time, struct sockaddr_in *addr) {
 
     uint8_t aes_key[32], hmac_key[32];
 
@@ -486,7 +486,7 @@ static void handle_message(ServerState *state, NodeState *node, SkyNetMessage *m
     }
 }
 
-static void *worker_thread(void *arg) {
+void *worker_thread(void *arg) {
     WorkerState *ws = (WorkerState *)arg;
     ServerState *state = ws->state;
     int worker_id = ws->worker_id;

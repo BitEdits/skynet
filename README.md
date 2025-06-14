@@ -17,6 +17,7 @@ Properties
 * UDP Interface
 * Single dependency (OpenSSL, replaceable)
 * 64KB L1 footprint
+* Threat model doesn't require non-repudiation (HMAC)
 
 Install
 -------

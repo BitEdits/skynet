@@ -419,14 +419,7 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
         print_openssl_error();
         return -1;
     }
-/*
-    uint32_t auth_data_len;
-    uint8_t *auth_data = prepare_auth_data(msg, &auth_data_len);
-    if (!auth_data) {
-        EVP_CIPHER_CTX_free(ctx);
-        return -1;
-    }
-*/
+
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1 ||
         EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1 ||
         EVP_DecryptInit_ex(ctx, NULL, NULL, aes_key, msg->iv) != 1) {
@@ -434,12 +427,7 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
-/*
-    if (!HMAC(EVP_sha256(), auth_data, 32, msg->payload, msg->payload_len, auth_data, &auth_data_len) || auth_data_len != 32) {
-        fprintf(stderr, "Error: HMAC verification computation failed\n");
-        return -1;
-    }
-*/
+
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, msg->payload + msg->payload_len - 16) != 1) {
         print_openssl_error();
         fprintf(stderr, "Error: Failed to set GCM tag\n");
