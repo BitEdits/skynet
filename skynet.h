@@ -1,8 +1,11 @@
 #ifndef SKYNET_H
 #define SKYNET_H
 
+#include <arpa/inet.h>
+#include <openssl/evp.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <stdatomic.h>
 
 #define SERVER_BASE_PATH "~/.skynet/ecc/secp384r1/"
 #define CLIENT_BASE_PATH "~/.skynet_client/ecc/secp384r1/"
@@ -10,6 +13,15 @@
 #define AES_KEY_LEN 32
 #define MAX_NODE_NAME 64
 #define MAX_BUFFER 1590
+#define SKYNET_VERSION 1
+#define SKYNET_MAX_NODES 11000
+#define TIME_SLOT_INTERVAL_US 1000
+#define QUEUE_SIZE 1024
+#define MAX_TOPICS 8
+#define THREAD_COUNT 4
+#define PORT 6566
+#define SLOT_COUNT 1000 // Number of slots for TDMA
+#define SEQ_CACHE_SIZE 1024 // Size of deduplication cache
 
 #define SKYNET_VERSION 1
 #define SKYNET_MAX_NODES 11000
@@ -108,7 +120,18 @@ typedef struct {
 #define FNV_OFFSET_BASIS_32 2166136261U
 #define FNV_PRIME_32 16777619U
 
-uint32_t fnv1a_32(const void *data, size_t len);
+typedef struct {
+    SkyNetMessage messages[QUEUE_SIZE];
+    struct sockaddr_in addrs[QUEUE_SIZE];
+    uint64_t recv_times[QUEUE_SIZE];
+    atomic_uint head;
+    atomic_uint tail;
+    int event_fds[THREAD_COUNT];
+} MessageQueue;
+
+struct ServerState; // Forward declaration
+
+uint32_t fnv1a_32(void *data, size_t len);
 void skynet_init(SkyNetMessage *msg, SkyNetMessageType type, uint32_t node_id, uint32_t npg_id, uint8_t qos);
 void skynet_encrypt_payload(SkyNetMessage *msg, const uint8_t *data, uint16_t data_length, const uint8_t *aes_key);
 int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_size);
@@ -120,7 +143,7 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
 int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_key);
 EVP_PKEY *load_ec_key(int srv, const char *node_name, int is_private);
 char *base_path(int srv);
-int save_public_key(int srv, const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len);
+int save_public_key(int srv, char *node_name, const uint8_t *pub_key_data, size_t pub_key_len);
 void print_openssl_error(void);
 char *expand_home(const char *path);
 int set_non_blocking(int fd);

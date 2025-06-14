@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s <nodeName>\n", argv[0]);
         return 1;
     }
-    const char *argname = argv[1];
+    char *argname = argv[1];
     if (strlen(argname) > MAX_NODE_NAME) {
         fprintf(stderr, "Node name too long (max %d characters)\n", MAX_NODE_NAME);
         return 1;
@@ -44,8 +44,8 @@ int main(int argc, char *argv[]) {
 
     EVP_PKEY *ec_key = load_ec_key(0, node_name, 1);
 
-    const char *topics[] = { "npg_control", "npg_pli", "npg_surveillance", "npg_chat",
-                             "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
+    char *topics[] = { "npg_control", "npg_pli", "npg_surveillance", "npg_chat",
+                       "npg_c2", "npg_alerts", "npg_logistics", "npg_coord"};
 
     EVP_PKEY *topic_pub_keys[8] = {0};
     for (int i = 0; i < 8; i++) {
@@ -289,7 +289,7 @@ int main(int argc, char *argv[]) {
         }
 
         uint32_t topic_hash = 0;
-        const char *topic = NULL;
+        char *topic = NULL;
         switch (msg.npg_id) {
             case SKYNET_NPG_CONTROL: topic = "npg_control"; break;
             case SKYNET_NPG_PLI: topic = "npg_pli"; break;

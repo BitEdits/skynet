@@ -422,8 +422,8 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     return 0;
 }
 
-uint32_t fnv1a_32(const void *data, size_t len) {
-    const uint8_t *bytes = (const uint8_t *)data;
+uint32_t fnv1a_32(void *data, size_t len) {
+    uint8_t *bytes = (uint8_t *)data;
     uint32_t hash = FNV_OFFSET_BASIS_32;
     for (size_t i = 0; i < len; ++i) {
         hash ^= bytes[i];
@@ -432,7 +432,7 @@ uint32_t fnv1a_32(const void *data, size_t len) {
     return hash;
 }
 
-int save_public_key(int srv, const char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
+int save_public_key(int srv, char *node_name, const uint8_t *pub_key_data, size_t pub_key_len) {
     char *dir_path = expand_home(base_path(srv));
     if (!dir_path) return -1;
     uint32_t hash = fnv1a_32(node_name, strlen(node_name));
