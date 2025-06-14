@@ -143,14 +143,6 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
         OSSL_PARAM_construct_end()
     };
 
-    if (EVP_KDF_derive(kdf_ctx, aes_key, 32, params) <= 0) {
-        print_openssl_error();
-        EVP_KDF_CTX_free(kdf_ctx);
-        EVP_KDF_free(kdf);
-        free(shared_secret);
-        return -1;
-    }
-
     if (EVP_KDF_derive(kdf_ctx, aes_key, AES_KEY_LEN, params) <= 0) {
         print_openssl_error();
         EVP_KDF_CTX_free(kdf_ctx);
@@ -427,7 +419,14 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
         print_openssl_error();
         return -1;
     }
-
+/*
+    uint32_t auth_data_len;
+    uint8_t *auth_data = prepare_auth_data(msg, &auth_data_len);
+    if (!auth_data) {
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
+    }
+*/
     if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1 ||
         EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, 16, NULL) != 1 ||
         EVP_DecryptInit_ex(ctx, NULL, NULL, aes_key, msg->iv) != 1) {
@@ -435,9 +434,15 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
-
+/*
+    if (!HMAC(EVP_sha256(), auth_data, 32, msg->payload, msg->payload_len, auth_data, &auth_data_len) || auth_data_len != 32) {
+        fprintf(stderr, "Error: HMAC verification computation failed\n");
+        return -1;
+    }
+*/
     if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, msg->payload + msg->payload_len - 16) != 1) {
         print_openssl_error();
+        fprintf(stderr, "Error: Failed to set GCM tag\n");
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
@@ -445,25 +450,27 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
     uint8_t outbuf[SKYNET_MAX_PAYLOAD];
     if (EVP_DecryptUpdate(ctx, outbuf, &outlen, msg->payload, msg->payload_len - 16) != 1) {
         print_openssl_error();
+        fprintf(stderr, "Error: DecryptUpdate with ciphertext failed\n");
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
 
     if (EVP_DecryptFinal_ex(ctx, outbuf + outlen, &finallen) != 1) {
         print_openssl_error();
+        fprintf(stderr, "Error: DecryptFinal failed\n");
         EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
 
     if (outlen + finallen > SKYNET_MAX_PAYLOAD) {
         fprintf(stderr, "Error: Decrypted payload too large: %d\n", outlen + finallen);
-        EVP_CIPHER_CTX_free(ctx);
         return -1;
     }
 
     memcpy(msg->payload, outbuf, outlen + finallen);
     msg->payload_len = outlen + finallen;
     EVP_CIPHER_CTX_free(ctx);
+    fprintf(stderr, "Debug: Decryption successful, plaintext_len=%u\n", msg->payload_len);
     return 0;
 }
 
