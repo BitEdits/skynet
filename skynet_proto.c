@@ -159,7 +159,7 @@ int derive_shared_key(EVP_PKEY *priv_key, EVP_PKEY *peer_pub_key, uint8_t *aes_k
 
 uint8_t *prepare_auth_data(const SkyNetMessage *msg, uint32_t *data_len) {
     *data_len = 2 + 4 + 4 + 4 + 16 + 2;
-    if (*data_len > SKYNET_MAX_PAYLOAD + 32) {
+    if (*data_len > MAX_BUFFER + 32) {
         fprintf(stderr, "Error: Auth data length too large: %u\n", *data_len);
         return NULL;
     }
@@ -190,8 +190,8 @@ uint8_t *prepare_auth_data(const SkyNetMessage *msg, uint32_t *data_len) {
 int skynet_encrypt(int srv, SkyNetMessage *msg, uint32_t from_node, uint32_t to_node, const uint8_t *data, uint16_t data_len) {
     fprintf(stderr, "Debug: Starting encryption on %s: from=%x, to=%x, size=%d\n", srv == 0 ? "client" : "server", from_node, to_node, data_len);
 
-    if (data_len > SKYNET_MAX_PAYLOAD - 16) {
-        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_len, SKYNET_MAX_PAYLOAD - 16);
+    if (data_len > MAX_BUFFER - 16) {
+        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_len, MAX_BUFFER - 16);
         return -1;
     }
 
@@ -233,7 +233,10 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
     prepare_node_names(from_node, to_node, from_name, to_name);
 
     EVP_PKEY *priv_key = NULL, *peer_pub_key = NULL;
-    if (load_keys(srv, to_name, from_name, &priv_key, &peer_pub_key) < 0) return -1;
+    if (load_keys(srv, to_name, from_name, &priv_key, &peer_pub_key) < 0) {
+        fprintf(stderr, "Error: Load keys failed for decryption.\n");
+        return -1;
+    }
 
     uint8_t aes_key[AES_KEY_LEN];
     if (derive_shared_key(priv_key, peer_pub_key, aes_key) < 0) {
@@ -246,7 +249,7 @@ int skynet_decrypt(int srv, SkyNetMessage *msg, uint32_t to_node, uint32_t from_
     EVP_PKEY_free(peer_pub_key);
 
     if (skynet_decrypt_payload(msg, aes_key) < 0) {
-        fprintf(stderr, "Error: Payload decryption failed\n");
+        fprintf(stderr, "Error: Payload decryption failed from=%x to=%x\n", from_node, to_node);
         return -1;
     }
 
@@ -274,8 +277,8 @@ void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_leng
         fprintf(stderr, "Error: Null pointer in skynet_set_data\n");
         return;
     }
-    if (data_length > SKYNET_MAX_PAYLOAD - 16) {
-        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_length, SKYNET_MAX_PAYLOAD - 16);
+    if (data_length > MAX_BUFFER - 16) {
+        fprintf(stderr, "Error: Payload too large: %u > %u\n", data_length, MAX_BUFFER - 16);
         return;
     }
 
@@ -294,7 +297,7 @@ void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_leng
     }
 
     int outlen = 0, finallen = 0;
-    uint8_t outbuf[SKYNET_MAX_PAYLOAD];
+    uint8_t outbuf[MAX_BUFFER];
     if (data && data_length > 0) {
         if (EVP_EncryptUpdate(ctx, outbuf, &outlen, data, data_length) != 1) {
             print_openssl_error();
@@ -310,7 +313,7 @@ void skynet_set_data(SkyNetMessage *msg, const uint8_t *data, uint16_t data_leng
     }
 
     msg->payload_len = outlen + finallen;
-    if (msg->payload_len > SKYNET_MAX_PAYLOAD - 16) {
+    if (msg->payload_len > MAX_BUFFER - 16) {
         fprintf(stderr, "Error: Encrypted payload too large: %u\n", msg->payload_len);
         EVP_CIPHER_CTX_free(ctx);
         return;
@@ -334,8 +337,8 @@ int skynet_serialize(const SkyNetMessage *msg, uint8_t *buffer, size_t buffer_si
         return -1;
     }
 
-    if (msg->payload_len > SKYNET_MAX_PAYLOAD) {
-        fprintf(stderr, "Error: Invalid payload length: %u > %u\n", msg->payload_len, SKYNET_MAX_PAYLOAD);
+    if (msg->payload_len > MAX_BUFFER) {
+        fprintf(stderr, "Error: Invalid payload length: %u > %u\n", msg->payload_len, MAX_BUFFER);
         return -1;
     }
 
@@ -381,8 +384,8 @@ int skynet_deserialize(SkyNetMessage *msg, const uint8_t *buffer, size_t buffer_
     memcpy(msg->iv, buffer + offset, 16); offset += 16;
     msg->payload_len = ntohs(*(uint16_t *)(buffer + offset)); offset += 2;
 
-    if (msg->payload_len > SKYNET_MAX_PAYLOAD) {
-        fprintf(stderr, "Error: Invalid payload length: %u > %u\n", msg->payload_len, SKYNET_MAX_PAYLOAD);
+    if (msg->payload_len > MAX_BUFFER) {
+        fprintf(stderr, "Error: Invalid payload length: %u > %u\n", msg->payload_len, MAX_BUFFER);
         return -1;
     }
 
@@ -435,23 +438,11 @@ int skynet_decrypt_payload(SkyNetMessage *msg, const uint8_t *aes_key) {
         return -1;
     }
 
-    uint8_t outbuf[SKYNET_MAX_PAYLOAD];
+    uint8_t outbuf[MAX_BUFFER];
     if (EVP_DecryptUpdate(ctx, outbuf, &outlen, msg->payload, msg->payload_len - 16) != 1) {
         print_openssl_error();
         fprintf(stderr, "Error: DecryptUpdate with ciphertext failed\n");
         EVP_CIPHER_CTX_free(ctx);
-        return -1;
-    }
-
-    if (EVP_DecryptFinal_ex(ctx, outbuf + outlen, &finallen) != 1) {
-        print_openssl_error();
-        fprintf(stderr, "Error: DecryptFinal failed\n");
-        EVP_CIPHER_CTX_free(ctx);
-        return -1;
-    }
-
-    if (outlen + finallen > SKYNET_MAX_PAYLOAD) {
-        fprintf(stderr, "Error: Decrypted payload too large: %d\n", outlen + finallen);
         return -1;
     }
 

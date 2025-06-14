@@ -459,7 +459,7 @@ void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uin
                                            else { to = topic_hash; }
 
     if (skynet_decrypt(1, msg, to, msg->node_id) < 0) {
-        fprintf(stderr, "Decryption failed for node %u, seq=%u\n", msg->node_id, msg->seq_no);
+        fprintf(stderr, "Decryption failed (from=%u, to=%u, seq=%u)\n", msg->node_id, to, msg->seq_no);
         return;
     }
 
@@ -471,9 +471,10 @@ void handle_message(ServerState *state, NodeState *node, SkyNetMessage *msg, uin
         case SKYNET_MSG_ACK:
         case SKYNET_MSG_WAYPOINT:
         case SKYNET_MSG_FORMATION:
+        case SKYNET_MSG_STATUS:
+             msg->node_id = 0x40ac3dd2;
              send_to_npg(state, msg, recv_time);
              break;
-        case SKYNET_MSG_STATUS:
         case SKYNET_MSG_KEY_EXCHANGE:
         case SKYNET_MSG_SLOT_REQUEST:
              process_control(state, node, msg, recv_time, addr);
@@ -510,7 +511,7 @@ void *worker_thread(void *arg) {
             while (queue_dequeue(state, &msg, &addr, &recv_time) == 0) {
 
                 NodeState *node = NULL;
-                if (msg.type == SKYNET_MSG_KEY_EXCHANGE) {
+                if (msg.type == SKYNET_MSG_KEY_EXCHANGE || msg.type == SKYNET_MSG_STATUS) {
                     char node_name[16];
                     snprintf(node_name, sizeof(node_name), "%08x", msg.node_id);
                     if (strlen(node_name) >= MAX_NODE_NAME) {
