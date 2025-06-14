@@ -7,7 +7,7 @@ Properties
 ----------
 
 * C99 Implementation
-* 32 bytes Minimal Message (48 with IV)
+* 32 bytes Minimal Message (48 with TAG)
 * ECC DH Key Exchange
 * Microseconds-precise Latency
 * Non-Blocking Atomic Primitives
