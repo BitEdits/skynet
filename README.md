@@ -109,8 +109,8 @@ Debug: Accessing keystore: /home/tonpa/.skynet_client/ecc/secp384r1/06c5bc52.ec_
 Debug: Enryption done OK
 ```
 
-Message
--------
+S-Message
+---------
 
 Skynet message format is designed for swarms of thousands.
 
