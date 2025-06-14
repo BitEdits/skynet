@@ -29,86 +29,7 @@ Skynet is the reference server implementing Link32 tactical battlefield protocol
 * Queue Management: Global network queue for incoming messages, with per-topic subscriber queues for efficient distribution.
 * Key Storage: Separate key stores per executable (~/.skynet/ for server, ~/.skynet_client/ for client) to isolate credentials.
 
-## Installation
-
-Link32 deploys via a single provisioning script (skynet.sh), which generates ECC key
-pairs for all network nodes and topics. Public keys must be copied to client key stores for mutual authentication.
-
-```
-$ git clone git@github.com:BitEdits/skynet
-$ cd skynet
-$ ./skynet.sh
-Generated keys for node npg_control (hash: 06c5bc52) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node npg_pli (hash: c9aef284) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node npg_surveillance (hash: 4d128cdc) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node npg_chat (hash: 9c69a767) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node npg_c2 (hash: 89f28794) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node npg_alerts (hash: 9f456bca) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node npg_logistics (hash: 542105cc) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node npg_coord (hash: e46c0c22) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node server (hash: 40ac3dd2) in /home/user/.skynet/ecc/secp384r1/
-Generated keys for node client (hash: 8f929c1e) in /home/user/.skynet_client/ecc/secp384r1/
-$ cp /home/user/.skynet/ecc/secp384r1/*.ec_pub /home/user/.skynet_client/ecc/secp384r1/
-$ gcc -o skynet skynet.c skynet_proto.c -pthread -lcrypto
-$ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
-$ ./skynet server &
-$ ./skynet_client client
-```
-
-## Dependencies
-
-* OpenSSL: Required for ECC key generation, ECDH, and AES-256-GCM encryption/decryption.
-* C99 Compiler: GCC or equivalent for building the server and client binaries.
-* POSIX Environment: For threading, epoll, and timerfd support.
-
 ## Link32 Protocol
-
-### Server Operation
-
-The server `skynet` binds to UDP port 6566, joins multicast groups for all
-topics (239.255.0.<npg_id>), and processes incoming messages using a global
-network queue (MessageQueue mq). It spawns worker threads (default: 4) pinned
-to CPU cores for concurrent message handling. Each topic has a dedicated
-subscriber queue (topic_queues[MAX_TOPICS]), and messages are forwarded
-to slot-specific multicast groups (239.255.1.<slot_id>) for dynamic topics.
-
-Example server output:
-
-```
-Node 40ac3dd2 bound to 0.0.0.0:6566.
-Joined multicast group 239.255.0.1 (NPG 1: control).
-Joined multicast group 239.255.0.6 (NPG 6: PLI).
-...
-Message received, from=8f929c1e, to=1, size=231.
-Decryption successful, from=8f929c1e, to=1, size=215.
-Saved public key for client 8f929c1e.
-Assigned slot 0 to node 8f929c1e.
-Message received, from=8f929c1e, to=6, size=40.
-Decryption successful, from=8f929c1e, to=6, size=24.
-Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0, latency=36643.
-```
-
-### Client Operation
-
-The client `skynet_client` connects to port 6566, joins topic-specific multicast groups, and sends:
-
-A key exchange message (SKYNET_MSG_KEY_EXCHANGE) to 239.255.0.1.
-A slot request (SKYNET_MSG_SLOT_REQUEST) to 239.255.0.1.
-Periodic status messages (SKYNET_MSG_STATUS) to the assigned slot’s multicast group (239.255.1.<slot_id>) or topic group (239.255.0.6 for PLI).
-
-Example client output:
-
-```
-Node 8f929c1e connecting to port 6566.
-Joined multicast group 239.255.0.1 (NPG 1).
-Joined multicast group 239.255.0.6 (NPG 6).
-...
-Sent key exchange message to server.
-Sent slot request message to server.
-Received slot assignment: slot=0.
-Joined slot multicast group 239.255.1.0.
-Sent status message: pos=[0.1, 0.1, 0.1], vel=[0.0, 0.0, 0.0], seq=2, multicast=239.255.1.0.
-```
 
 ### S-Message Format
 
@@ -211,21 +132,101 @@ Nodes subscribe to topics based on their role, joining the corresponding multica
 | Relay | 1, 6, 101 | Control, PLI, and alerts for message relaying. |
 | Controller | 1, 6, 100, 101 | Control, PLI, C2, and alerts for command posts. |
 
-## Skynet Build Instructions
+## Skynet
+
+### Dependencies
+
+* OpenSSL: Required for ECC key generation, ECDH, and AES-256-GCM encryption/decryption.
+* C99 Compiler: GCC or equivalent for building the server and client binaries.
+* POSIX Environment: For threading, epoll, and timerfd support.
+
+### Build
 
 ```
-$ gcc -o skynet skynet.c skynet_proto.c -pthread -lcrypto
+$ git clone git@github.com:BitEdits/skynet
+$ cd skynet
+$ gcc -o skynet_keygen skynet_keygen.c skynet_proto.c -lcrypto
 $ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
+$ gcc -o skynet        skynet.c        skynet_proto.c -lcrypto
 ```
 
-## Usage
+### Installation
+
+Link32 deploys via a single provisioning script (skynet.sh), which generates ECC key
+pairs for all network nodes and topics. Public keys must be copied to client key stores for mutual authentication.
+
+```
+$ ./skynet.sh
+Generated keys for node npg_control (hash: 06c5bc52) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node npg_pli (hash: c9aef284) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node npg_surveillance (hash: 4d128cdc) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node npg_chat (hash: 9c69a767) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node npg_c2 (hash: 89f28794) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node npg_alerts (hash: 9f456bca) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node npg_logistics (hash: 542105cc) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node npg_coord (hash: e46c0c22) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node server (hash: 40ac3dd2) in /home/user/.skynet/ecc/secp384r1/
+Generated keys for node client (hash: 8f929c1e) in /home/user/.skynet_client/ecc/secp384r1/
+$ cp /home/user/.skynet/ecc/secp384r1/*.ec_pub /home/user/.skynet_client/ecc/secp384r1/
+```
+
+### Server Operation
+
+The server `skynet` binds to UDP port 6566, joins multicast groups for all
+topics (239.255.0.<npg_id>), and processes incoming messages using a global
+network queue (MessageQueue mq). It spawns worker threads (default: 4) pinned
+to CPU cores for concurrent message handling. Each topic has a dedicated
+subscriber queue (topic_queues[MAX_TOPICS]), and messages are forwarded
+to slot-specific multicast groups (239.255.1.<slot_id>) for dynamic topics.
+
+Example server output:
+
+```
+$ ./skynet server
+Node 40ac3dd2 bound to 0.0.0.0:6566.
+Joined multicast group 239.255.0.1 (NPG 1: control).
+Joined multicast group 239.255.0.6 (NPG 6: PLI).
+...
+Message received, from=8f929c1e, to=1, size=231.
+Decryption successful, from=8f929c1e, to=1, size=215.
+Saved public key for client 8f929c1e.
+Assigned slot 0 to node 8f929c1e.
+Message received, from=8f929c1e, to=6, size=40.
+Decryption successful, from=8f929c1e, to=6, size=24.
+Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0, latency=36643.
+```
+
+### Client Operation
+
+The client `skynet_client` connects to port 6566, joins topic-specific multicast groups, and sends:
+
+A key exchange message (SKYNET_MSG_KEY_EXCHANGE) to 239.255.0.1.
+A slot request (SKYNET_MSG_SLOT_REQUEST) to 239.255.0.1.
+Periodic status messages (SKYNET_MSG_STATUS) to the assigned slot’s multicast group (239.255.1.<slot_id>) or topic group (239.255.0.6 for PLI).
+
+Example client output:
+
+```
+$ ./skynet_client client
+Node 8f929c1e connecting to port 6566.
+Joined multicast group 239.255.0.1 (NPG 1).
+Joined multicast group 239.255.0.6 (NPG 6).
+...
+Sent key exchange message to server.
+Sent slot request message to server.
+Received slot assignment: slot=0.
+Joined slot multicast group 239.255.1.0.
+Sent status message: pos=[0.1, 0.1, 0.1], vel=[0.0, 0.0, 0.0], seq=2, multicast=239.255.1.0.
+```
+
+### Usage
 
 1. Run the server: `./skynet server`
 2. Run the client: `./skynet_client client`
 3. The client sends key exchange, slot request, and status messages.
 4. The server assigns a slot, forwards status messages to `239.255.1.<slot_id>`, and logs all activity.
 
-## Limitations
+### Limitations
 
 * Slot Scalability: Fixed `SLOT_COUNT=256` limits dynamic topics to 256 nodes.
 * No Retransmission: Messages dropped due to network errors are not retransmitted (aligned with QoS settings).
