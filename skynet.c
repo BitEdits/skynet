@@ -152,18 +152,21 @@ void server_init(ServerState *state, char *node_name) {
     }
 
     for (int i = 0; i < MAX_TOPICS; i++) {
+
         uint32_t topic_hash = fnv1a_32(topic_names[i], strlen(topic_names[i]));
         char topic_name[16];
         snprintf(topic_name, sizeof(topic_name), "%08x", topic_hash);
-//        printf("Loading topic private key %s (hash: %s)\n", topic_names[i], topic_name);
         state->topic_priv_keys[i] = load_ec_key(1, topic_name, 1);
+
         if (!state->topic_priv_keys[i]) {
             fprintf(stderr, "Failed to load topic private key %s\n", topic_names[i]);
             EVP_PKEY_free(state->ec_key);
             for (int j = 0; j < i; j++) EVP_PKEY_free(state->topic_priv_keys[j]);
             exit(1);
         }
-        printf("Initializing topic queue %d=%s (%x)\n", i, topic_names[i], topic_hash);
+
+        printf("%sInitializing topic queue %d=%s (%x).%s\n", CYAN, i, topic_names[i], topic_hash, RESET);
+
         queue_init(&state->topic_queues[i]);
     }
 
@@ -172,7 +175,7 @@ void server_init(ServerState *state, char *node_name) {
     memset(state->slots, 0, sizeof(state->slots));
     memset(state->seq_cache, 0, sizeof(state->seq_cache));
     atomic_store(&state->running, 1);
-    printf("Initializing local queue 0=%s (%x)\n", state->server_name, state->node_id);
+    printf("%sInitializing local queue 0=%s (%x).%s\n", CYAN, state->server_name, state->node_id, RESET);
     queue_init(&state->mq);
     state->server_addr.sin_family = AF_INET;
     state->server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -204,6 +207,7 @@ int assign_slot(ServerState *state, uint32_t node_id) {
         if (state->slots[i] == 0) {
             state->slots[i] = node_id;
             state->slot_count++;
+            printf("%sAssigned slot %d to node %08x.%s\n", CYAN, i, node_id, RESET);
             return i;
         }
     }
@@ -261,7 +265,13 @@ void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_tim
     }
 }
 
+// Process message
 void process_message(ServerState *state, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t recv_time) {
+    if (msg->node_id == state->node_id) {
+        printf("Skipping self-sent message from=%x, to=%x, seq=%u\n", msg->node_id, msg->npg_id, msg->seq_no);
+        return;
+    }
+
     if (is_duplicate(state, msg->node_id, msg->seq_no)) {
         fprintf(stderr, "Duplicate message from %x, seq=%u\n", msg->node_id, msg->seq_no);
         return;
@@ -443,7 +453,6 @@ int main(int argc, char *argv[]) {
         perror("bind failed");
         goto cleanup;
     }
-    printf("%sNode %s bound to %s:%d.%s\n", CYAN, node_name, inet_ntoa(state->server_addr.sin_addr), ntohs(state->server_addr.sin_port), RESET);
 
     struct ip_mreq mreq;
     for (int i = 0; i < MAX_TOPICS; i++) {
@@ -488,6 +497,9 @@ int main(int argc, char *argv[]) {
         perror("epoll_ctl timer failed");
         goto cleanup;
     }
+
+
+    printf("%sNode %s bound to %s:%d.%s\n", CYAN, node_name, inet_ntoa(state->server_addr.sin_addr), ntohs(state->server_addr.sin_port), RESET);
 
     for (int i = 0; i < THREAD_COUNT; i++) {
         WorkerState *ws = malloc(sizeof(WorkerState));
