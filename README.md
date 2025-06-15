@@ -39,47 +39,47 @@ The Skynet Message structure is compact, designed for swarms of thousands of nod
 
 ```
 typedef struct {
-    uint8_t version : 4;        // Protocol version (current: 1)
-    uint8_t type : 4;           // Message type (0-6)
-    uint8_t qos : 4;            // Quality of Service (0-3)
-    uint8_t hop_count : 4;      // Hop count for routing (0-15)
-    uint32_t npg_id;            // Topic identifier (1-103)
-    uint32_t node_id;           // Sender node ID (FNV-1a hash)
-    uint32_t seq_no;            // Sequence number for deduplication
-    uint8_t iv[16];             // AES-256-GCM initialization vector
-    uint16_t payload_len;       // Payload length (0-65519)
+    uint8_t version : 4;         // Protocol version (current: 1)
+    uint8_t type : 4;            // Message type (0-6)
+    uint8_t qos : 4;             // Quality of Service (0-3)
+    uint8_t hop_count : 4;       // Hop count for routing (0-15)
+    uint32_t npg_id;             // Topic identifier (1-103)
+    uint32_t node_id;            // Sender node ID (FNV-1a hash)
+    uint32_t seq_no;             // Sequence number for deduplication
+    uint8_t iv[16];              // AES-256-GCM initialization vector
+    uint16_t payload_len;        // Payload length (0-32767)
     uint8_t payload[MAX_BUFFER]; // Encrypted payload + 16-byte GCM tag
 } SkyNetMessage;
 ```
 
 * Header Size: 32 bytes (version, type, QoS, hop_count, npg_id, node_id, seq_no, iv, payload_len).
 * Total Size: 48 bytes minimum (32-byte header + 16-byte GCM tag for empty payload).
-* Payload: Up to 65519 bytes (limited by MAX_BUFFER=65535 minus header and tag).
+* Payload: Up to 32720 bytes.
 
 ### Message Types
 
-| Type | ID | Description |
-|------|----|-------------|
-| Key Exchange | 0 | Exchanges ECC public keys for ECDH session setup. |
-| Slot Request | 1 | Requests a TDMA slot from the server. |
-| Chat | 2 | Sends tactical chat messages. |
-| Ack | 3 | Acknowledges slot assignments or other control messages. |
-| Waypoint | 4 | Specifies navigation waypoints for C2. |
-| Status | 5 | Reports position, velocity, or sensor data (e.g., PLI). |
-| Formation | 6 | Coordinates swarm formations. |
+|Id | Type         | Description                                              |
+|---|--------------|----------------------------------------------------------|
+| 0 | Key Exchange | Exchanges ECC public keys for ECDH session setup.        |
+| 1 | Slot Request | Requests a TDMA slot from the server.                    |
+| 2 | Chat         | Sends tactical chat messages.                            |
+| 3 | Ack          | Acknowledges slot assignments or other control messages. |
+| 4 | Waypoint     | Specifies navigation waypoints for C2.                   |
+| 5 | Status       | Reports position, velocity, or sensor data (e.g., PLI).  |
+| 6 | Formation    | Coordinates swarm formations.                            |
 
 ### Multicast Topics
 
-| NPG ID | Name | Multicast Group | Purpose |
-|--------|------|-----------------|---------|
-| 1 | npg_control | 239.255.0.1 | Handles key exchange (type 0) and slot requests (type 1) for network control. |
-| 6 | npg_pli | 239.255.0.6 | Processes status messages (type 5) for position location information, updating node positions and velocities. |
-| 7 | npg_surveillance | 239.255.0.7 | Forwards status messages (type 5) with sensor data to subscribers (e.g., command posts). |
-| 29 | npg_chat | 239.255.0.29 | Relays chat (type 2) and ack (type 3) messages for tactical communication. |
-| 100 | npg_c2 | 239.255.0.100 | Processes waypoint (type 4) and formation (type 6) messages for command and control. |
-| 101 | npg_alerts | 239.255.0.101 | Broadcasts status messages (type 5) for network alerts and self-healing. |
-| 102 | npg_logistics | 239.255.0.102 | Handles status (type 5) and chat (type 2) for logistical coordination. |
-| 103 | npg_coord | 239.255.0.103 | Relays chat (type 2), waypoint (type 4), and formation (type 6) for inter-agent coordination. |
+| NPG | Name             | Multicast     | Purpose                                                                  |
+|-----|------------------|---------------|--------------------------------------------------------------------------|
+| 1   | npg_control      | 239.255.0.1   | Handles key exchange and slot requests for network control.              |
+| 6   | npg_pli          | 239.255.0.6   | Processes status messages for position location/velocities information . |
+| 7   | npg_surveillance | 239.255.0.7   | Forwards status messages with sensor data to subscribers.                |
+| 29  | npg_chat         | 239.255.0.29  | Relays chat and ack messages for tactical communication.                 |
+| 100 | npg_c2           | 239.255.0.100 | Processes waypoint and formation messages for command and control.       |
+| 101 | npg_alerts       | 239.255.0.101 | Broadcasts status messages for network alerts and self-healing.          |
+| 102 | npg_logistics    | 239.255.0.102 | Handles status and chat for logistical coordination.                     |
+| 103 | npg_coord        | 239.255.0.103 | Relays chat, waypoint, and formation for inter-agent coordination.       |
 
 ### Slot Management
 
@@ -124,15 +124,15 @@ Implementation details:
 
 Nodes subscribe to topics based on their role, joining the corresponding multicast groups:
 
-| Role | NPGs Subscribed | Purpose |
-|------|-----------------|---------|
-| Infantry | 1, 29 | Network control and tactical chat. |
-| Drone | 1, 6, 7, 100, 101 | Control, PLI, surveillance, C2, and alerts. |
-| Air | 1, 6, 7, 100, 101, 103 | Control, PLI, surveillance, C2, alerts, and coordination. |
-| Sea | 1, 7, 29, 102, 103 | Control, surveillance, chat, logistics, and coordination. |
-| Ground | 1, 7, 29, 102 | Control, surveillance, chat, and logistics. |
-| Relay | 1, 6, 101 | Control, PLI, and alerts for message relaying. |
-| Controller | 1, 6, 100, 101 | Control, PLI, C2, and alerts for command posts. |
+| Role       | NPGs Subscribed        | Purpose |
+|------------|------------------------|-----------------------------------------------------------|
+| Infantry   | 1, 29                  | Network control and tactical chat.                        |
+| Drone      | 1, 6, 7, 100, 101      | Control, PLI, surveillance, C2, and alerts.               |
+| Air        | 1, 6, 7, 100, 101, 103 | Control, PLI, surveillance, C2, alerts, and coordination. |
+| Sea        | 1, 7, 29, 102, 103     | Control, surveillance, chat, logistics, and coordination. |
+| Ground     | 1, 7, 29, 102          | Control, surveillance, chat, and logistics.               |
+| Relay      | 1, 6, 101              | Control, PLI, and alerts for message relaying.            |
+| Controller | 1, 6, 100, 101         | Control, PLI, C2, and alerts for command posts.           |
 
 ## Skynet
 
@@ -172,7 +172,12 @@ $ cp ~/.skynet/ecc/secp384r1/*.ec_pub ~/.skynet_client/ecc/secp384r1/
 
 ### Server Operation
 
-The server `skynet` binds to UDP port 6566, joins multicast groups for all topics (239.255.0.<npg_id>), and processes incoming messages using a global network queue (MessageQueue mq). It spawns worker threads (default: THREAD_COUNT=4) pinned to CPU cores for concurrent message handling. Each topic has a dedicated subscriber queue (topic_queues[MAX_TOPICS]), and messages are forwarded to slot-specific multicast groups (239.255.1.<slot_id>) for dynamic topics.
+The server `skynet` binds to UDP port 6566, joins multicast groups for all topics `239.255.0.<npg_id>`,
+and processes incoming messages using a global network queue (MessageQueue mq). It spawns worker
+threads pinned to CPU cores for concurrent message handling.
+
+Each topic has a dedicated subscriber queue `topic_queues`,
+and messages are forwarded to slot-specific multicast groups `239.255.1.<slot_id>` for dynamic topics.
 
 Example server output:
 
