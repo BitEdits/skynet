@@ -23,7 +23,7 @@ in pure C99 with zero dependencies (awaiting OpenSSL replacement).
 
 ## Principles
 
-* Key Provisioning: Single script (skynet.sh) generates ECC key pairs for nodes and topics; public keys require manual distribution.
+* Key Provisioning: public keys require controleable (manual) distribution.
 * Mandatory Encryption: All messages are encrypted with AES-256-GCM.
 * Node Identification: Node names are hashed to 32-bit using FNV-1a for compact addressing.
 * Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap (CMPXCHG) for concurrency.
