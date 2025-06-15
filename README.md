@@ -9,6 +9,31 @@ multicast networks.
 Skynet is the reference server implementing Link32 tactical battlefield protocol implemented
 in pure C99 hwith a single OpenSSL dependency (planned for replacement).
 
+# TOC
+
+* (1) Properties
+* (2) Principles
+* (3) Link32 Protocol
+* (3.1) S-Message Format
+* (3.2) Message Types
+* (3.3) Multicast Topics
+* (3.4) Slot Management
+* (3.5) Deduplication
+* (3.6) Security
+* (3.7) Subscriptions
+* (4) Skynet
+* (4.1) Dependencies
+* (4.2) Build
+* (4.3) Installation
+* (4.4) Server Operation
+* (4.5) Client Operation
+* (5) Usage
+* (5.1) skynet_keygen
+* (5.2) skynet_encrypt
+* (5.3) skynet_decrypt
+* (5.4) skynet_client
+* (5.5) skynet
+
 ## Properties
 
 * Implementation: Written in C99 for portability and performance on resource-constrained devices.
