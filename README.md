@@ -7,7 +7,7 @@ location information (PLI), command and control (C2), and tactical chat over UDP
 multicast networks.
 
 Skynet is the reference server implementing Link32 tactical battlefield protocol implemented
-in pure C99 hwith a single OpenSSL dependency (planned for replacement).
+in pure C99 with a single OpenSSL dependency (to be replaced in real applcations).
 
 # TOC
 
