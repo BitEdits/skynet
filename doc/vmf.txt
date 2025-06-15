@@ -88,4 +88,4 @@ K07.10 Emergency Resupply Request
 Bibliography
 ------------
 
-[1]. https://www.marines.mil/portals/1/publications/mco%203093.3.pdf?utm_source=chatgpt.com
+[1]. https://www.marines.mil/portals/1/publications/mco%203093.3.pdf

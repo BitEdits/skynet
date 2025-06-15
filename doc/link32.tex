@@ -1,0 +1,291 @@
+\documentclass{article}
+\usepackage{listings}
+\lstset{basicstyle=\footnotesize\ttfamily}
+
+\begin{document}
+
+\title{Skynet/Link32: A Tactical Communication Protocol and Reference Implementation}
+\author{Namdak Tonpa}
+\date{June 15, 2025}
+\maketitle
+
+\begin{abstract}
+Link32 is a tactical communication protocol designed for low-latency, secure,
+and scalable data exchange in contested environments, supporting swarm coordination,
+real-time position location information (PLI), command and control (C2), and tactical
+chat over UDP-based multicast networks. We present its design and reference implementation.
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}
+Link32 is a tactical communication protocol inspired by standards such as VMF, LINK16,
+TSM, SRW, and MQTT, tailored for military applications requiring robust, low-latency,
+and secure data exchange in contested environments. It facilitates swarm coordination,
+real-time position location information (PLI), command and control (C2), and tactical
+chat using UDP-based multicast networks. Skynet is the reference server implementation
+of Link32, developed in C99 with minimal dependencies to ensure portability and
+ performance on resource-constrained devices.
+
+\subsection{Properties}
+Link32 and Skynet are designed with the following properties:
+\begin{itemize}
+    \item \textbf{Implementation}: Written in C99 for portability and performance.
+    \item \textbf{Message Size}: Minimum 32-byte header (48 bytes with AES-256-GCM tag) to optimize bandwidth.
+    \item \textbf{Security}: ECDH key exchange over secp384r1, AES-256-GCM encryption for all messages.
+    \item \textbf{Latency}: Microsecond-precision timing using monotonic clocks and non-blocking I/O.
+    \item \textbf{Concurrency}: Lock-free atomic operations (CMPXCHG) for thread-safe queue management.
+    \item \textbf{Networking}: UDP multicast with topic-based subscriptions.
+    \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
+    \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
+    \item \textbf{Threat Model}: Prioritizes confidentiality and integrity, no non-repudiation.
+\end{itemize}
+
+\subsection{Principles}
+Link32 adheres to the following design principles:
+\begin{itemize}
+    \item \textbf{Key Provisioning}: Manual public key distribution for controlled setup.
+    \item \textbf{Mandatory Encryption}: All messages encrypted with AES-256-GCM.
+    \item \textbf{Node Identification}: Node names hashed to 32-bit using FNV-1a.
+    \item \textbf{Lock-Free Design}: Uses atomic compare-and-swap (CMPXCHG) for concurrency.
+    \item \textbf{Topic Architecture}: Topics map to IP multicast groups for publish-subscribe.
+    \item \textbf{Queue Management}: Global network queue with per-topic subscriber queues.
+    \item \textbf{Key Storage}: Separate key stores per executable.
+\end{itemize}
+
+\section{Link32 Protocol}
+
+\subsection{S-Message Format}
+The Link32 message structure, \texttt{SkyNetMessage}, is compact for large-scale swarm communication:
+\begin{lstlisting}
+typedef struct {
+    uint8_t version : 4;   // Protocol version (current: 1)
+    uint8_t type : 4;      // Message type (0-6)
+    uint8_t qos : 4;       // Quality of Service (0-3)
+    uint8_t hop_count : 4; // Hop count for routing (0-15)
+    uint32_t npg_id;       // Topic identifier (1-103)
+    uint32_t node_id;      // Sender node ID (FNV-1a hash)
+    uint32_t seq_no;       // Sequence number for deduplication
+    uint8_t iv[16];        // AES-256-GCM initialization vector
+    uint16_t payload_len;  // Payload length (0-32767)
+    uint8_t payload[MAX_BUFFER]; // Encrypted payload + 16-byte GCM tag
+} SkyNetMessage;
+\end{lstlisting}
+\begin{itemize}
+    \item \textbf{Header Size}: 32 bytes.
+    \item \textbf{Total Size}: 48 bytes minimum (32-byte header + 16-byte GCM tag).
+    \item \textbf{Payload}: Up to 32720 bytes.
+\end{itemize}
+
+\subsection{Message Types}
+The protocol defines seven message types, as shown in Table~\ref{tab:msgtypes}:
+\begin{table}[h]
+\centering
+\caption{Link32 Message Types}
+\begin{tabular}{cll}
+\hline
+\textbf{ID} & \textbf{Type} & \textbf{Description} \\
+\hline
+0 & Key Exchange & Exchanges ECC public keys for ECDH session setup. \\
+1 & Slot Request & Requests a TDMA slot from the server. \\
+2 & Chat & Sends tactical chat messages. \\
+3 & Ack & Acknowledges slot assignments or control messages. \\
+4 & Waypoint & Specifies navigation waypoints for C2. \\
+5 & Status & Reports position, velocity, or sensor data (e.g., PLI). \\
+6 & Formation & Coordinates swarm formations. \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Multicast Topics}
+Link32 uses multicast topics mapped to IP multicast groups, as listed in Table~\ref{tab:topics}:
+\begin{table}[h]
+\centering
+\caption{Multicast Topics}
+\begin{tabular}{clll}
+\hline
+\textbf{NPG} & \textbf{Name} & \textbf{Multicast} & \textbf{Purpose} \\
+\hline
+1 & npg\_control & 239.255.0.1 & Network control (key exchange, slot requests). \\
+6 & npg\_pli & 239.255.0.6 & Position information (status messages). \\
+7 & npg\_surveillance & 239.255.0.7 & Sensor data forwarding. \\
+29 & npg\_chat & 239.255.0.29 & Tactical chat and acknowledgments. \\
+100 & npg\_c2 & 239.255.0.100 & Command and control (waypoints, formations). \\
+101 & npg\_alerts & 239.255.0.101 & Network alerts and self-healing. \\
+102 & npg\_logistics & 239.255.0.102 & Logistical coordination (status, chat). \\
+103 & npg\_coord & 239.255.0.103 & Inter-agent coordination (chat, waypoints). \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Slot Management}
+Link32 employs a Time Division Multiple Access (TDMA)-like slot manager to minimize collisions:
+\begin{itemize}
+    \item \textbf{Slot Array}: Fixed-size array (\texttt{slots[SLOT\_COUNT=256]}) in \texttt{ServerState}.
+    \item \textbf{Dynamic Topics}: Each slot creates a temporary multicast group (239.255.1.<slot\_id \% 256>).
+    \item \textbf{Allocation}: First-come, first-serve with no timeouts.
+    \item \textbf{Timing}: Slots cycle every \texttt{TIME\_SLOT\_INTERVAL\_US=1000$\mu$s}.
+\end{itemize}
+Clients send \texttt{SKYNET\_MSG\_SLOT\_REQUEST} to NPG 1, and the server assigns slots via \texttt{SKYNET\_MSG\_ACK}.
+
+\subsection{Deduplication}
+A fixed-size circular buffer (\texttt{seq\_cache}) prevents message loops:
+\begin{itemize}
+    \item \textbf{Structure}: Stores \texttt{\{node\_id, seq\_no, timestamp\}}.
+    \item \textbf{Memory}: $\sim$16KB (1024 $\times$ 16 bytes).
+    \item \textbf{Complexity}: O(1) lookup using FNV-1a hashing.
+    \item \textbf{Threshold}: Discards duplicates within 1 second.
+\end{itemize}
+
+\subsection{Security}
+\label{subsec:security}
+Security mechanisms include:
+\begin{itemize}
+    \item \textbf{Key Exchange}: ECDH over secp384r1 for 256-bit AES keys.
+    \item \textbf{Encryption}: AES-256-GCM with 16-byte IV and 16-byte tag.
+    \item \textbf{Key Storage}: Server: \texttt{\textasciitilde/.skynet/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}}; Client: \texttt{\textasciitilde/.skynet\_client/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}}.
+    \item \textbf{Key Derivation}: HKDF-SHA256 for AES keys.
+    \item \textbf{Self-Sent Handling}: Skips messages where \texttt{msg->node\_id == state->node\_id}.
+\end{itemize}
+
+\subsection{Subscriptions}
+\label{subsec:subs}
+Nodes subscribe to topics based on roles, as shown in Table~\ref{tab:subs}:
+\begin{table}[h]
+\centering
+\caption{Role-Based Subscriptions}
+\begin{tabular}{llp{8cm}}
+\hline
+\textbf{Role} & \textbf{NPGs} & \textbf{Purpose} \\
+\hline
+Infantry & 1, 29 & Network control and tactical chat. \\
+Drone & 1, 6, 7, 100, 101 & Control, PLI, surveillance, C2, alerts. \\
+Air & 1, 6, 7, 100, 101, 103 & Control, PLI, surveillance, C2, alerts, coordination. \\
+Sea & 1, 7, 29, 102, 103 & Control, surveillance, chat, logistics, coordination. \\
+Ground & 1, 7, 29, 102 & Control, surveillance, chat, logistics. \\
+Relay & 1, 6, 101 & Control, PLI, alerts for relaying. \\
+Controller & 1, 6, 100, 101 & Control, PLI, C2, alerts for command posts. \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Skynet Implementation}
+
+\subsection{Dependencies}
+\begin{itemize}
+    \item \textbf{OpenSSL}: For ECC, ECDH, and AES-256-GCM.
+    \item \textbf{C99 Compiler}: GCC or equivalent.
+    \item \textbf{POSIX Environment}: For threading, epoll, and timerfd.
+\end{itemize}
+
+\subsection{Build}
+To build Skynet:
+\begin{lstlisting}[language=bash]
+$ git clone git@github.com:BitEdits/skynet
+$ cd skynet
+$ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
+$ gcc -o skynet skynet.c skynet_proto.c -pthread -lcrypto
+\end{lstlisting}
+
+\subsection{Installation}
+The provisioning script \texttt{skynet.sh} generates ECC key pairs:
+\begin{lstlisting}[language=bash]
+# ./skynet.sh
+Generated keys for node npg_control (hash: 06c5bc52) in /secp/
+Generated keys for node npg_pli (hash: c9aef284) in /secp/
+Generated keys for node npg_surveillance (hash: 4d128cdc) in /secp/
+Generated keys for node npg_chat (hash: 9c69a767) in /secp/
+Generated keys for node npg_c2 (hash: 89f28794) in cc/secp/
+Generated keys for node npg_alerts (hash: 9f456bca) in /secp/
+Generated keys for node npg_logistics (hash: 542105cc) in /secp/
+Generated keys for node npg_coord (hash: e46c0c22) in /secp/
+Generated keys for node server (hash: 40ac3dd2) in /secp/
+Generated keys for node client (hash: 8f929c1e) in /client/secp/
+# cp /secp/*.ec_pub /client/secp/
+\end{lstlisting}
+
+\subsection{Server Operation}
+The server binds to UDP port 6566, joins multicast groups, and processes messages using a global queue. Example output:
+\begin{lstlisting}
+# skynet server
+Node 40ac3dd2 bound to 0.0.0.0:6566.
+Joined multicast group 239.255.0.1 (NPG 1: control).
+Joined multicast group 239.255.0.6 (NPG 6: PLI).
+Message received, from=8f929c1e, to=1, size=231.
+Decryption successful, from=8f929c1e, to=1, size=215.
+Saved public key for client 8f929c1e.
+Assigned slot 0 to node 8f929c1e.
+Message received, from=8f929c1e, to=6, size=40.
+Decryption successful, from=8f929c1e, to=6, size=24.
+Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0, latency=36643.
+\end{lstlisting}
+
+\subsection{Client Operation}
+The client joins topic-specific multicast groups and sends key exchange, slot requests, and status messages. Example output:
+\begin{lstlisting}
+# skynet_client client
+Node 8f929c1e connecting to port 6566.
+Joined multicast group 239.255.0.1 (NPG 1).
+Joined multicast group 239.255.0.6 (NPG 6).
+Sent key exchange message to server.
+Sent slot request message to server.
+Received slot assignment: slot=0.
+Joined slot multicast group 239.255.1.0.
+Sent status message: multicast=239.255.1.0,
+                     pos=[0.1, 0.1, 0.1],
+                     vel=[0.0, 0.0, 0.0],
+                     seq=2.
+\end{lstlisting}
+
+\subsection{Usage}
+Skynet includes five utilities:
+
+\subsubsection*{Keys Provisioning}
+Generates ECC key pairs.
+\begin{lstlisting}
+skynet_keygen <node> [--server|--client]
+\end{lstlisting}
+
+\subsubsection*{Message Encryption}
+Encrypts a test message to \texttt{<npg\_id>.sky}.
+\begin{lstlisting}
+skynet_encrypt <sender> <recipient> <file>
+\end{lstlisting}
+
+\subsubsection*{Message Decryption}
+Decrypts \texttt{<file.sky>}.
+\begin{lstlisting}
+skynet_decrypt <sender> <recipient> <file.sky>
+\end{lstlisting}
+
+\subsubsection*{Skynet Server}
+Runs the server with FNV-1a hashed \texttt{<node>}.
+\begin{lstlisting}
+skynet <node>
+\end{lstlisting}
+
+\subsubsection*{Skynet Client}
+Runs the client with FNV-1a hashed \texttt{<node>}.
+\begin{lstlisting}
+skynet_client <node>
+\end{lstlisting}
+
+\subsection{Limitations}
+\begin{itemize}
+    \item \textbf{Slot Scalability}: Fixed \texttt{SLOT\_COUNT=256} limits nodes to 256.
+    \item \textbf{No Retransmission}: Dropped messages are not retransmitted.
+    \item \textbf{Key Management}: Manual public key copying required.
+    \item \textbf{Deduplication}: \texttt{SEQ\_CACHE\_SIZE=1024} may cause collisions.
+\end{itemize}
+
+\section{Conclusion}
+Link32 and Skynet provide a robust framework for tactical communication, combining low-latency,
+security, and scalability. Future improvements could address slot scalability, automated key
+distribution, and enhanced deduplication to support larger networks.
+
+\begin{thebibliography}{10}
+\bibitem{milstd6016} U.S. Department of Defense, ``MIL-STD-6016: Tactical Data Link (TDL) J Message Standard,'' 2008.
+\bibitem{ada404334} U.S. Department of Defense, ``Link 16 Network Management and Operations,'' ADA404334, 2003.
+\end{thebibliography}
+
+\end{document}

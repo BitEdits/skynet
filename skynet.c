@@ -1,4 +1,4 @@
-// gcc -o skynet skynet.c skynet_proto.c -pthread -lcrypto
+// gcc -o skynet skynet.c skynet_proto.c -lcrypto
 // skynet server
 
 #define _GNU_SOURCE
