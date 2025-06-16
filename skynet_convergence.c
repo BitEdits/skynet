@@ -1,6 +1,6 @@
 /*
  * SkyNet Convergence Layer Overview
- * Copoyright (c) 2025 Namdak Tonpa
+ * Copyright (c) 2025 Namdak Tonpa
  *
  * This module implements a PDCP-like Convergence Layer for SkyNet,
  * enhancing QoS, slot management, and traffic isolation. Below is a
