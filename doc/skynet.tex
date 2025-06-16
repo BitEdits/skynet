@@ -52,7 +52,7 @@ Link32 and Skynet are designed with the following properties:
     \item \textbf{Swarm Scalability}: Supports large-scale drone swarms via dynamic slot allocation.
     \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
     \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
-    \item \textbf{Threat Model}: Prioritizes, confidentiality and integrity, no HMAC (non-repudiation).
+    \item \textbf{Threat Model}: Prioritizes, confidentiality and integrity, no non-repudiation (HMAC may be included in payload).
 \end{itemize}
 
 \newpage
@@ -62,9 +62,9 @@ Link32 adheres to the following design principles:
     \item \textbf{Key Provisioning}: Manual public key distribution for controlled setup.
     \item \textbf{Mandatory Encryption}: All messages encrypted with AES-256-GCM.
     \item \textbf{Node Identification}: Node names hashed to 32-bit using FNV-1a.
-    \item \textbf{Lock-Free Design}: Uses atomic compare-and-swap (CMPXCHG) for concurrency.
-    \item \textbf{Topic Architecture}: Topics map to IP multicast groups for publish-subscribe.
-    \item \textbf{Queue Management}: Global network queue with per-topic subscriber queues.
+    \item \textbf{Lock-Free Design}: Uses atomic compare-and-swap for concurrency.
+    \item \textbf{Topic Architecture}: Topics map to IP multicast groups.
+    \item \textbf{Queue Management}: Global network queue, per-topic subscribes.
     \item \textbf{Key Storage}: Separate key stores per executable.
 \end{itemize}
 
@@ -100,7 +100,7 @@ The protocol defines seven message types, as shown in Table 1.
 \begin{table}[h]
 \centering
 \caption{Link32 Message Types}
-\begin{tabular}{clp{7cm}}
+\begin{tabular}{clp{8cm}}
 \hline
 \textbf{ID} & \textbf{Type} & \textbf{Description} \\
 \hline
@@ -125,14 +125,14 @@ Link32 uses multicast topics mapped to IP multicast groups, as in Table 2.
 \hline
 \textbf{NPG} & \textbf{Name} & \textbf{Multicast} & \textbf{Purpose} \\
 \hline
-1   & npg\_control      & 239.255.0.1   & Network control (key exchange, slot requests). \\
+1   & npg\_control      & 239.255.0.1   & Kkey exchange, Slot requests. \\
 6   & npg\_pli          & 239.255.0.6   & Position information (status). \\
 7   & npg\_surveillance & 239.255.0.7   & Sensor data forwarding. \\
-29  & npg\_chat         & 239.255.0.29  & Tactical chat and acknowledgments. \\
+29  & npg\_chat         & 239.255.0.29  & Tactical chat and acks. \\
 100 & npg\_c2           & 239.255.0.100 & C2 (waypoints, formations). \\
 101 & npg\_alerts       & 239.255.0.101 & Network alerts and self-healing. \\
-102 & npg\_logistics    & 239.255.0.102 & Logistical coordination (status, chat). \\
-103 & npg\_coord        & 239.255.0.103 & Swarm Coordination (chat, waypoints). \\
+102 & npg\_logistics    & 239.255.0.102 & Logistical coordination. \\
+103 & npg\_coord        & 239.255.0.103 & Swarm Coordination. \\
 \hline
 \end{tabular}
 \end{table}
@@ -176,7 +176,7 @@ Nodes subscribe to topics based on roles, as shown in Table 3:
 \begin{table}[h]
 \centering
 \caption{Role-Based Subscriptions}
-\begin{tabular}{llp{4cm}}
+\begin{tabular}{lllp{5cm}}
 \hline
 \textbf{Role} & \textbf{NPGs} & \textbf{Purpose} \\
 \hline
