@@ -9,8 +9,8 @@ multicast networks.
 Skynet is the reference server implementing Link32 tactical battlefield protocol implemented
 in pure C99 with a single OpenSSL dependency (to be replaced in real applcations).
 
-* [1] <a href="https://BitEdits.github.io/skynet/skynet.pdf">Namdak Tonpa. A Tactical Communication Protocol Link32 and Skynet Reference Implementation.</a>. 2025.
-* [2] <a href="https://github.com/BitEdits/skynet/">Skynet Github Open Source Link32 Implementation.</a> 2025.
+* [1] <a href="https://BitEdits.github.io/skynet/skynet.pdf">Namdak Tonpa. A Tactical Communication Protocol Link32 and Skynet Reference Implementation</a>. 2025.
+* [2] <a href="https://github.com/BitEdits/skynet/">Skynet Github Open Source Link32 Implementation</a>. 2025.
 
 ## Properties
 
