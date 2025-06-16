@@ -278,6 +278,121 @@ skynet_client <node>
     \item \textbf{Deduplication}: \texttt{SEQ\_CACHE\_SIZE=1024} may cause collisions.
 \end{itemize}
 
+\section{Convergence Archtecture}
+The Skynet system's convergence layer employs a 3-level structural hierarchy comprising
+Quality of Service (QoS), Bearer, and Entity components. This design is driven by the
+need for granular QoS control, per-node resource management, reliable packet delivery,
+dynamic slot allocation, and scalability in a Time Division Multiple Access (TDMA)-based
+tactical network. Inspired by the Long-Term Evolution (LTE) QoS Class Identifier (QCI)
+framework, the hierarchy ensures military-grade performance, including latency below
+50ms for command-and-control (C2) traffic and reliable delivery for critical communications.
+Compared to alternative designs, such as flat or centralized structures, this approach
+excels in dynamic, resilient scenarios, providing robust and scalable QoS management.
+
+\subsubsection{Flat QoS Structure}
+A flat QoS structure assigns slots directly to Network Protocol Groups (NPGs) based
+on their QoS profiles, without intermediate bearer or entity layers. For example,
+an NPG like \texttt{SKYNET\_NPG\_C2} might be statically allocated three slots with
+QoS level 3. While simpler and requiring less memory, this approach lacks per-node
+isolation, making it unsuitable for dynamic networks with multiple nodes sharing
+the same NPG. It also complicates reliable delivery, as there is no mechanism for
+per-flow reordering or sequence tracking. Additionally, static slot assignments
+cannot adapt to node arrivals or departures, leading to inefficient resource
+utilization. The 3-level hierarchy overcomes these limitations by introducing
+bearers for flow isolation and entities for node-level coordination, enabling
+ dynamic and scalable QoS management.
+
+\subsubsection{Hierarchical QoS Structure}
+The 3-level hierarchy separates concerns into QoS, Bearer, and Entity layers,
+each addressing specific aspects of network management. The \texttt{SkyNetBearerQoS}
+structure defines QoS parameters such as priority (1--15, where 1 is highest),
+delay budget (in milliseconds), reliability (best-effort or reliable),
+and minimum TDMA slots, allowing precise service differentiation.
+The \texttt{SkyNetBearer} represents a logical communication channel for a node-NPG pair,
+encapsulating QoS parameters, assigned slots, and state for reordering and reliability.
+The \texttt{SkyNetConvergenceEntity} aggregates bearers for a single node,
+managing slot requests and coordinating resource allocation.
+This modular design ensures scalability, flexibility, and robustness,
+outperforming flat structures by providing flow isolation and dynamic adaptation.
+
+\subsubsection{Granular QoS Control}
+Tactical networks handle diverse traffic types, such as C2, position location
+information (PLI), and chat, each with distinct latency, reliability,
+and bandwidth requirements. A uniform QoS approach fails to meet these needs.
+The \texttt{SkyNetBearerQoS} structure enables granular control by defining
+specific parameters for each bearer. For instance, \texttt{SKYNET\_NPG\_CONTROL}
+(NPG 1, QoS 3) is assigned three slots with a low delay budget to ensure timely
+C2 delivery, while \texttt{SKYNET\_NPG\_CHAT} (NPG 103, QoS 0) receives one slot
+for best-effort traffic. This differentiation, inspired by LTE QCI, guarantees
+that high-priority traffic meets stringent military requirements,
+such as sub-50ms latency for C2, while optimizing resource allocation for lower-priority flows.
+
+\subsubsection{Per-Node and Per-Flow Resource Management}
+Each node in the network may support multiple concurrent flows (e.g., C2, PLI, control)
+with varying QoS needs. Without isolation, these flows compete for resources,
+risking contention and degraded performance. The \texttt{SkyNetBearer}
+structure provides flow-level isolation by associating each bearer with
+a specific node-NPG pair, tracking its assigned slots and QoS parameters.
+The \texttt{SkyNetConvergenceEntity} groups all bearers for a node,
+enabling centralized resource management and preventing one flow from starving others.
+This per-node and per-flow approach ensures efficient slot allocation,
+supports multiple simultaneous communications, and scales to accommodate dynamic network topologies.
+
+\subsubsection{Reliability and Reordering}
+TDMA networks may deliver packets out of order due to slot scheduling
+or retransmissions, particularly for reliable traffic (e.g., \texttt{reliability=1}).
+The \texttt{SkyNetBearer} includes a \texttt{reorder\_queue} and
+tracks \texttt{expected\_seq\_no} and \texttt{last\_delivered} to
+reorder packets and ensure reliable delivery. The \texttt{SkyNetConvergenceEntity}
+coordinates reorder checks across bearers using \texttt{last\_reorder\_time\_us},
+minimizing overhead. This mechanism is critical for applications requiring guaranteed
+delivery, such as C2 or control messages, and enhances robustness compared to
+flat structures, which lack per-flow reordering capabilities.
+
+\subsubsection{Dynamic Slot Allocation}
+Tactical networks operate in dynamic environments where nodes join or leave,
+and traffic patterns shift. Static slot assignments are inefficient and inflexible.
+The \texttt{SkyNetConvergenceEntity} tracks \texttt{slot\_requests\_pending} and
+manages bearer slot assignments via \texttt{assigned\_slots} and \texttt{slot\_count}.
+The \texttt{SkyNetBearerQoS} parameter \texttt{min\_slots} ensures minimum resource
+guarantees, while the entity facilitates dynamic re-allocation through
+the \texttt{skynet\_convergence\_schedule\_slots} function.
+Weighted Fair Queuing, driven by bearer priorities, optimizes slot distribution,
+ensuring high-QoS traffic receives preferential treatment.
+This adaptability is a key advantage over static or centralized designs.
+
+\subsubsection{Scalability and Modularity}
+A flat QoS structure becomes unwieldy as the number of nodes and NPGs increases,
+complicating scheduling and state management. The 3-level hierarchy addresses this
+by separating concerns: QoS defines service requirements, bearers manage
+flow-specific state, and entities coordinate node-level convergence.
+This modular design scales to support large networks, simplifies debugging,
+and facilitates maintenance. The entity layer aggregates bearer state, reducing
+scheduling complexity from O($n$) for $n$ bearers to O($m$) for $m$ nodes.
+The hierarchy also supports future enhancements, such as preemption or adaptive QoS,
+without requiring a system overhaul.
+
+\subsubsection{LTE QCI Compatibility}
+The 3-level hierarchy draws inspiration from LTE's QCI framework,
+which uses bearers with QoS profiles to manage diverse traffic
+types (e.g., VoIP, video, best-effort) per User Equipment (UE).
+By adapting this model to TDMA, Skynet replaces LTE's EPS bearers with
+TDMA slot-based bearers, leveraging telecom best practices.
+The \texttt{SkyNetBearerQoS} parameters mirror QCI attributes,
+such as priority and delay budget, ensuring compatibility with established standards.
+This alignment reduces design risk, enhances interoperability with telecom systems,
+and provides a familiar framework for engineers, making it easier to develop and maintain the system.
+
+In conclusion, the 3-level QoS, Bearer, Entity hierarchy is a robust and
+scalable solution for managing QoS in Skynet's TDMA-based tactical network.
+It addresses critical requirements for granular control, per-node resource
+management, reliable delivery, dynamic slot allocation, and scalability,
+while drawing on LTE QCI principles to ensure proven performance.
+Compared to alternatives like flat or centralized designs,
+this hierarchy offers superior flexibility and resilience,
+meeting military-grade standards with sub-50ms latency and
+reliable communication for mission-critical applications.
+
 \section{Conclusion}
 Link32 and Skynet provide a robust framework for tactical communication, combining low-latency,
 security, and scalability. Future improvements could address slot scalability, automated key
