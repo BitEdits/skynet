@@ -2,6 +2,13 @@
 \usepackage{listings}
 \lstset{basicstyle=\footnotesize\ttfamily}
 
+\lefthyphenmin=1
+\hyphenpenalty=100
+\tolerance=11000
+\emergencystretch=1em
+\hfuzz=2pt
+\vfuzz=2pt
+
 \begin{document}
 
 \title{A Tactical Communication Protocol Link32 \\ and Reference Implementation Skynet}
@@ -25,7 +32,7 @@ robust performance in mission-critical scenarios.
 
 \newpage
 \section{Introduction}
-Link32 is a tactical communication protocol inspired by standards such as VMF, LINK16, TSM, SRW, and
+Link32 is a tactical communication protocol inspired by standards such as VMF, Link16, TSM, SRW, and
 MQTT, tailored for military applications requiring robust, low-latency, and secure data exchange in
 contested environments. It facilitates swarm drone coordination, real-time position location
 information (PLI), command and control (C2), and tactical chat using UDP-based multicast networks.
@@ -49,7 +56,7 @@ Link32 and Skynet are designed with the following properties:
     \item \textbf{Swarm Scalability}: Supports large-scale drone swarms via dynamic slot allocation.
     \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
     \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
-    \item \textbf{Threat Model}: Prioritizes confidentiality and integrity, no non-repudiation.
+    \item \textbf{Threat Model}: Prioritizes, confidentiality and integrity, no HMAC (non-repudiation).
 \end{itemize}
 
 \subsection{Principles}
@@ -80,7 +87,7 @@ typedef struct {
   uint32_t seq_no;        // Sequence number for deduplication
   uint8_t iv[16];         // AES-256-GCM initialization vector
   uint16_t payload_len;   // Payload length (0-32767)
-  uint8_t payload[MAX_BUFFER]; // Encrypted payload + 16-byte GCM tag
+  uint8_t payload[MAX_BUFFER];     // GCM-TAG
 } SkyNetMessage;
 \end{lstlisting}
 \begin{itemize}
@@ -89,12 +96,12 @@ typedef struct {
     \item \textbf{Payload}: Up to 32720 bytes.
 \end{itemize}
 
+\newpage
 \subsection{Message Types}
-The protocol defines seven message types, as shown in Table~\ref{tab:msgtypes}:
-\begin{table}[h]
+The protocol defines seven message types, as shown in Table 1:
+\begin{table}
 \centering
 \caption{Link32 Message Types}
-\label{tab:msgtypes}
 \begin{tabular}{clp{7cm}}
 \hline
 \textbf{ID} & \textbf{Type} & \textbf{Description} \\
@@ -111,27 +118,27 @@ The protocol defines seven message types, as shown in Table~\ref{tab:msgtypes}:
 \end{table}
 
 \subsection{Multicast Topics}
-Link32 uses multicast topics mapped to IP multicast groups, as listed in Table~\ref{tab:topics}:
-\begin{table}[h]
+Link32 uses multicast topics mapped to IP multicast groups, as listed in Table 2:
+\begin{table}
 \centering
 \caption{Multicast Topics}
-\label{tab:topics}
 \begin{tabular}{cllp{5cm}}
 \hline
 \textbf{NPG} & \textbf{Name} & \textbf{Multicast} & \textbf{Purpose} \\
 \hline
 1 & npg\_control & 239.255.0.1 & Network control (key exchange, slot requests). \\
-6 & npg\_pli & 239.255.0.6 & Position information (status messages). \\
+6 & npg\_pli & 239.255.0.6 & Position information (status). \\
 7 & npg\_surveillance & 239.255.0.7 & Sensor data forwarding. \\
 29 & npg\_chat & 239.255.0.29 & Tactical chat and acknowledgments. \\
-100 & npg\_c2 & 239.255.0.100 & Command and control (waypoints, formations). \\
+100 & npg\_c2 & 239.255.0.100 & C2 (waypoints, formations). \\
 101 & npg\_alerts & 239.255.0.101 & Network alerts and self-healing. \\
 102 & npg\_logistics & 239.255.0.102 & Logistical coordination (status, chat). \\
-103 & npg\_coord & 239.255.0.103 & Inter-agent coordination (chat, waypoints). \\
+103 & npg\_coord & 239.255.0.103 & Swarm Coordination (chat, waypoints). \\
 \hline
 \end{tabular}
 \end{table}
 
+\newpage
 \subsection{Slot Management}
 Link32 employs a Time Division Multiple Access (TDMA)-like slot manager to minimize collisions:
 \begin{itemize}
@@ -148,45 +155,38 @@ Clients send \texttt{SKYNET\_MSG\_SLOT\_REQUEST} to NPG 1, and the server assign
 \subsection{Deduplication}
 A fixed-size circular buffer (\texttt{seq\_cache}) prevents message loops:
 \begin{itemize}
-    \item \textbf{Structure}: Stores \texttt{\{node\_id, seq\_no, timestamp\}}.
+    \item \textbf{Structure}: Stores \texttt{node\_id}, \texttt{seq\_no}.
     \item \textbf{Memory}: $\sim$16KB (1024 $\times$ 16 bytes).
     \item \textbf{Complexity}: O(1) lookup using FNV-1a hashing.
     \item \textbf{Threshold}: Discards duplicates within 1 second.
 \end{itemize}
 
 \subsection{Security}
-\label{subsec:security}
 Security mechanisms include:
 \begin{itemize}
     \item \textbf{Key Exchange}: ECDH over secp384r1 for 256-bit AES keys.
     \item \textbf{Encryption}: AES-256-GCM with 16-byte IV and 16-byte tag.
-    \item \textbf{Key Storage}: Server:
-          \texttt{\textasciitilde/.skynet/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}};
-          Client:
-          \texttt{\textasciitilde/.skynet\_client/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}}.
+    \item \textbf{Key Storage}: Per Process in \texttt{ec\_priv} and \texttt{ec\_pub}.
     \item \textbf{Key Derivation}: HKDF-SHA256 for AES keys.
-    \item \textbf{Self-Sent Handling}: Skips messages where
-          \texttt{msg->node\_id == state->node\_id}.
+    \item \textbf{Self-messages}: Skips (drops)  messages.
 \end{itemize}
 
 \subsection{Subscriptions}
-\label{subsec:subs}
-Nodes subscribe to topics based on roles, as shown in Table~\ref{tab:subs}:
-\begin{table}[h]
+Nodes subscribe to topics based on roles, as shown in Table 3:
+\begin{table}
 \centering
 \caption{Role-Based Subscriptions}
-\label{tab:subs}
-\begin{tabular}{llp{7cm}}
+\begin{tabular}{llp{4cm}}
 \hline
 \textbf{Role} & \textbf{NPGs} & \textbf{Purpose} \\
 \hline
-Infantry & 1, 29 & Network control and tactical chat. \\
-Drone & 1, 6, 7, 100, 101 & Control, PLI, surveillance, C2, alerts. \\
-Air & 1, 6, 7, 100, 101, 103 & Control, PLI, surveillance, C2, alerts, coordination. \\
-Sea & 1, 7, 29, 102, 103 & Control, surveillance, chat, logistics, coordination. \\
-Ground & 1, 7, 29, 102 & Control, surveillance, chat, logistics. \\
-Relay & 1, 6, 101 & Control, PLI, alerts for relaying. \\
-Controller & 1, 6, 100, 101 & Control, PLI, C2, alerts for command posts. \\
+Infantry   & 1, 29                  & Network control and tactical chat. \\
+Drone      & 1, 6, 7, 100, 101      & C2, PLI, surv., alerts. \\
+Air        & 1, 6, 7, 100, 101, 103 & C2, PLI, surv., alerts, coord. \\
+Sea        & 1, 7, 29, 102, 103     & C2, surveillance, chat, logistics, coord. \\
+Ground     & 1, 7, 29, 102          & C2, surveillance, chat, logistics. \\
+Relay      & 1, 6, 101              & C2, PLI, alerts for relaying. \\
+Controller & 1, 6, 100, 101         & C2, PLI, alerts for command posts. \\
 \hline
 \end{tabular}
 \end{table}
@@ -206,7 +206,7 @@ To build Skynet:
 $ git clone git@github.com:BitEdits/skynet
 $ cd skynet
 $ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
-$ gcc -o skynet skynet.c skynet_proto.c skynet_convergence.c -pthread -lcrypto
+$ gcc -o skynet skynet.c skynet_proto.c skynet_conv.c -lcrypto
 \end{lstlisting}
 
 \subsection{Installation}
@@ -240,7 +240,7 @@ Saved public key for client 8f929c1e.
 Assigned slot 0 to node 8f929c1e.
 Message received, from=8f929c1e, to=6, size=40.
 Decryption successful, from=8f929c1e, to=6, size=24.
-Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0, latency=36643.
+Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0.
 \end{lstlisting}
 
 \subsection{Client Operation}
