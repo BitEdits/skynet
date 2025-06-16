@@ -454,8 +454,7 @@ communications. MQTT defines three QoS levels:
           command and control (C2) messages requiring no loss or duplication.
 \end{itemize}
 Skynet implements these using its \texttt{SkyNetBearerQoS} and \texttt{SkyNetBearer} structures,
-configured via \texttt{skynet\_convergence\_init} and processed in
-\texttt{skynet\_convergence\_process\_message}. QoS 0 skips \texttt{reorder\_queue} and ACKs, QoS 1
+configured via \texttt{skynet\_convergence\_init}. QoS 0 skips \texttt{reorder\_queue} and ACKs, QoS 1
 uses ACKs (\texttt{SKYNET\_MSG\_ACK}) with retransmission on timeout (100ms), and QoS 2 employs a
 handshake with strict ordering and deduplication via \texttt{seq\_no}. All Network Protocol Groups
 (NPGs) and message types are mapped to QoS levels, as shown in Table 4.
