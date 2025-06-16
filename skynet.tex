@@ -50,7 +50,7 @@ Link32 and Skynet are designed with the following properties:
     \item \textbf{Swarm Scalability}: Supports large-scale drone swarms via dynamic slot allocation.
     \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
     \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
-    \item \textbf{Threat Model}: Prioritizes, confidentiality and integrity, no non-repudiation (HMAC may be included in payload).
+    \item \textbf{Threat Model}: Confidentiality and integrity, no non-repudiation.
 \end{itemize}
 
 \newpage
@@ -209,7 +209,7 @@ $ gcc -o skynet skynet.c skynet_proto.c skynet_conv.c -lcrypto
 \subsection{Installation}
 The provisioning script \texttt{skynet.sh} generates ECC key pairs:
 \begin{lstlisting}
-$ ./skynet.sh
+# ./skynet.sh
 Generated keys for node npg_control (hash: 06c5bc52) in /secp/
 Generated keys for node npg_pli (hash: c9aef284) in /secp/
 Generated keys for node npg_surveillance (hash: 4d128cdc) in /secp/
@@ -220,14 +220,14 @@ Generated keys for node npg_logistics (hash: 542105cc) in /secp/
 Generated keys for node npg_coord (hash: e46c0c22) in /secp/
 Generated keys for node server (hash: 40ac3dd2) in /secp/
 Generated keys for node client (hash: 8f929c1e) in /client/secp/
-$ cp /secp/*.ec_pub /client/secp/
+# cp /secp/*.ec_pub /client/secp/
 \end{lstlisting}
 
 \subsection{Server Operation}
 The server binds to UDP port 6566, joins multicast groups, and processes messages using a global
 queue. Example output:
 \begin{lstlisting}
-$ skynet server
+# skynet server
 Node 40ac3dd2 bound to 0.0.0.0:6566.
 Joined multicast group 239.255.0.1 (NPG 1: control).
 Joined multicast group 239.255.0.6 (NPG 6: PLI).
@@ -238,14 +238,13 @@ Assigned slot 0 to node 8f929c1e.
 Message received, from=8f929c1e, to=6, size=40.
 Decryption successful, from=8f929c1e, to=6, size=24.
 Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0.
-$
 \end{lstlisting}
 
 \subsection{Client Operation}
 The client joins topic-specific multicast groups and sends key exchange, slot requests, and status
 messages. Example output:
 \begin{lstlisting}
-$ skynet_client client
+# skynet_client client
 Node 8f929c1e connecting to port 6566.
 Joined multicast group 239.255.0.1 (NPG 1).
 Joined multicast group 239.255.0.6 (NPG 6).
@@ -257,7 +256,6 @@ Sent status message: multicast=239.255.1.0,
                      pos=[0.1, 0.1, 0.1],
                      vel=[0.0, 0.0, 0.0],
                      seq=2.
-$
 \end{lstlisting}
 
 \newpage
