@@ -2,11 +2,9 @@
 \usepackage{listings}
 \lstset{basicstyle=\footnotesize\ttfamily}
 
+\tolerance=2048
 \lefthyphenmin=2
-\hyphenpenalty=100
-\tolerance=2000
-\hfuzz=2pt
-\vfuzz=2pt
+\hyphenpenalty=127
 
 \begin{document}
 
@@ -179,8 +177,8 @@ Nodes subscribe to topics based on roles, as shown in Table 3:
 \textbf{Role} & \textbf{NPGs} & \textbf{Purpose} \\
 \hline
 Infantry   & 1, 29                  & Network control and tactical chat. \\
-Drone      & 1, 6, 7, 100, 101      & C2, PLI, surv., alerts. \\
-Air        & 1, 6, 7, 100, 101, 103 & C2, PLI, surv., alerts, coord. \\
+Drone      & 1, 6, 7, 100, 101      & C2, PLI, surveillance, alerts. \\
+Air        & 1, 6, 7, 100, 101, 103 & C2, PLI, surveillance, alerts, coord. \\
 Sea        & 1, 7, 29, 102, 103     & C2, surveillance, chat, logistics, coord. \\
 Ground     & 1, 7, 29, 102          & C2, surveillance, chat, logistics. \\
 Relay      & 1, 6, 101              & C2, PLI, alerts for relaying. \\
