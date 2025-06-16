@@ -141,10 +141,8 @@ Link32 uses multicast topics mapped to IP multicast groups, as in Table 2.
 \subsection{Slot Management}
 Link32 employs a Time Division Multiple Access (TDMA)-like slot manager to minimize collisions:
 \begin{itemize}
-    \item \textbf{Slot Array}: Fixed-size array (\texttt{slots[SLOT\_COUNT=256]}) in
-          \texttt{ServerState}.
-    \item \textbf{Dynamic Topics}: Each slot creates a temporary multicast group
-          (239.255.1.<slot\_id \% 256>).
+    \item \textbf{Slot Array}: Fixed-size (256) array \texttt{slots}.
+    \item \textbf{Dynamic Topics}: Each slot creates a temporary multicast group.
     \item \textbf{Allocation}: First-come, first-serve with no timeouts.
     \item \textbf{Timing}: Slots cycle every \texttt{TIME\_SLOT\_INTERVAL\_US=1000$\mu$s}.
 \end{itemize}
