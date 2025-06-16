@@ -55,8 +55,8 @@ void skynet_convergence_init(SkyNetConvergenceEntity *entity, uint32_t node_id);
 int skynet_convergence_process(SkyNetConvergenceEntity *entity, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t recv_time); // Process incoming message (reordering, deduplication)
 int skynet_convergence_deliver(SkyNetConvergenceEntity *entity, SkyNetBearer *bearer, SkyNetMessage *delivered_msg); // Deliver reordered messages to upper layer
 int skynet_convergence_request_slots(SkyNetConvergenceEntity *entity, uint32_t bearer_id, uint32_t npg_id, uint8_t qos); // Request slots for a bearer
-void skynet_convergence_schedule_slots(QoSSlotAssignment *qos_slots, uint32_t *slots, uint32_t qos_slot_count, uint32_t slot_count);
-//void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t *slots, uint32_t slot_count); // Schedule slots across bearers
+void skynet_convergence_schedule_slots_qos(QoSSlotAssignment *qos_slots, uint32_t *slots, uint32_t qos_slot_count, uint32_t slot_count);
+void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t *slots, uint32_t slot_count); // Schedule slots across bearers
 int skynet_convergence_preempt_slots(SkyNetConvergenceEntity *entity, uint32_t high_priority_bearer_id); // Preempt low-priority slots
 int skynet_convergence_add_bearer(SkyNetConvergenceEntity *entity, uint32_t npg_id, uint8_t qos); // Add a new bearer
 void skynet_convergence_remove_bearer(SkyNetConvergenceEntity *entity, uint32_t bearer_id); // Remove a bearer

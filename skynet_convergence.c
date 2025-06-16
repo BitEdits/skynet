@@ -164,7 +164,6 @@ int skynet_convergence_request_slots(SkyNetConvergenceEntity *entity, uint32_t b
     return 1; // Request pending
 }
 
-/*
 void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t *slots, uint32_t slot_count) {
     // Weighted Fair Queuing: Allocate slots based on priority
     uint32_t total_weight = 0;
@@ -190,9 +189,8 @@ void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t
         }
     }
 }
-*/
 
-void skynet_convergence_schedule_slots(QoSSlotAssignment *qos_slots, uint32_t *slots, uint32_t qos_slot_count, uint32_t slot_count) {
+void skynet_convergence_schedule_slots_qos(QoSSlotAssignment *qos_slots, uint32_t *slots, uint32_t qos_slot_count, uint32_t slot_count) {
     // Reset slot assignments
     for (uint32_t i = 0; i < qos_slot_count; i++) {
         uint32_t target_slots = qos_slots[i].slot_count;

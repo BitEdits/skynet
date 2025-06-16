@@ -1,9 +1,9 @@
 // gcc -o skynet skynet.c skynet_proto.c -lcrypto
 // skynet server
+
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -13,13 +13,13 @@
 #include <sys/timerfd.h>
 #include <sys/eventfd.h>
 #include <sys/types.h>
-#include <time.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
 #include <stdatomic.h>
 #include <net/if.h>
+#include <openssl/rand.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -51,7 +51,7 @@ typedef struct {
     QoSSlotAssignment qos_slots[MAX_TOPICS];
     uint32_t qos_slot_count;
     NodeRole role;
-    bool slots_assigned; // Track if slots are scheduled
+    bool slots_assigned;
 } ServerState;
 
 typedef struct {
@@ -190,16 +190,15 @@ void server_init(ServerState *state, char *node_name) {
     state->role = NODE_ROLE_CONTROLLER;
     state->slots_assigned = false;
 
-    // Initialize slots for controller
     if (state->role == NODE_ROLE_CONTROLLER) {
         for (uint32_t i = 0; i < SLOT_COUNT; i++) {
-            state->slots[i] = i + 1; // Simple slot IDs
+            state->slots[i] = i + 1;
         }
-        skynet_convergence_schedule_slots(state->qos_slots, state->slots, state->qos_slot_count, SLOT_COUNT);
+        skynet_convergence_schedule_slots_qos(state->qos_slots, state->slots, state->qos_slot_count, SLOT_COUNT);
         state->slots_assigned = true;
         for (uint32_t i = 0; i < state->qos_slot_count; i++) {
-            printf("Initial: Assigned %u slots to NPG %u (QoS %u)\n",
-                   state->qos_slots[i].slot_count, state->qos_slots[i].npg_id, state->qos_slots[i].qos);
+            printf("%sInitial: Assigned %u slots to NPG %u (QoS %u).%s\n", CYAN,
+                   state->qos_slots[i].slot_count, state->qos_slots[i].npg_id, state->qos_slots[i].qos, RESET);
         }
     }
 }
@@ -227,7 +226,8 @@ void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_tim
     for (uint32_t i = 0; i < state->qos_slot_count; i++) {
         if (state->qos_slots[i].npg_id == msg->npg_id) {
             if (state->qos_slots[i].slot_count > 0) {
-                slot_id = state->qos_slots[i].slot_ids[0];
+                // Cycle through slots based on current_slot
+                slot_id = state->qos_slots[i].slot_ids[state->current_slot % state->qos_slots[i].slot_count];
             }
             topic_idx = i;
             break;
@@ -271,7 +271,8 @@ void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_tim
 
 void process_message(ServerState *state, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t recv_time) {
     if (msg->node_id == state->node_id) {
-        printf("Skipping self-sent message from=%x, to=%x, seq=%u\n", msg->node_id, msg->npg_id, msg->seq_no);
+        printf("%sSkipping self-sent message from=%x, to=%x, seq=%u.%s\n", CYAN,
+               msg->node_id, msg->npg_id, msg->seq_no, RESET);
         return;
     }
 
@@ -356,14 +357,13 @@ void process_message(ServerState *state, SkyNetMessage *msg, struct sockaddr_in 
             }
         }
         if (!slot_found && state->role == NODE_ROLE_CONTROLLER) {
-            // Re-schedule slots to accommodate new request
             for (uint32_t i = 0; i < state->qos_slot_count; i++) {
                 state->qos_slots[i].slot_count = (state->qos_slots[i].qos == SKYNET_QOS_C2) ? 3 :
                                                 (state->qos_slots[i].qos == SKYNET_QOS_PLI) ? 2 : 1;
             }
-            skynet_convergence_schedule_slots(state->qos_slots, state->slots, state->qos_slot_count, SLOT_COUNT);
+            skynet_convergence_schedule_slots_qos(state->qos_slots, state->slots, state->qos_slot_count, SLOT_COUNT);
             for (uint32_t i = 0; i < state->qos_slot_count; i++) {
-                printf("Re-assigned %u slots to NPG %u (QoS %u) for node %u.%s\n", CYAN,
+                printf("%sRe-assigned %u slots to NPG %u (QoS %u) for node %u.%s\n", CYAN,
                        state->qos_slots[i].slot_count, state->qos_slots[i].npg_id, state->qos_slots[i].qos, msg->node_id, RESET);
             }
             for (uint32_t i = 0; i < state->qos_slot_count; i++) {
@@ -603,7 +603,6 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 state->current_slot = (state->current_slot + 1) % SLOT_COUNT;
-                // Slot scheduling handled in server_init or SKYNET_MSG_SLOT_REQUEST
             }
         }
     }
