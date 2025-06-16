@@ -164,6 +164,7 @@ int skynet_convergence_request_slots(SkyNetConvergenceEntity *entity, uint32_t b
     return 1; // Request pending
 }
 
+/*
 void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t *slots, uint32_t slot_count) {
     // Weighted Fair Queuing: Allocate slots based on priority
     uint32_t total_weight = 0;
@@ -185,6 +186,28 @@ void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t
                 bearer->assigned_slots[bearer->slot_count++] = slots[slot_idx++];
                 printf("Assigned slot %u to bearer %u (priority=%u)\n",
                        bearer->assigned_slots[bearer->slot_count-1], bearer->bearer_id, bearer->qos.priority);
+            }
+        }
+    }
+}
+*/
+
+void skynet_convergence_schedule_slots(QoSSlotAssignment *qos_slots, uint32_t *slots, uint32_t qos_slot_count, uint32_t slot_count) {
+    uint32_t total_weight = 0;
+    for (uint32_t i = 0; i < qos_slot_count; i++) {
+        total_weight += (16 - qos_slots[i].priority);
+    }
+    if (total_weight == 0) return;
+
+    uint32_t slot_idx = 0;
+    for (uint32_t i = 0; i < qos_slot_count && slot_idx < slot_count; i++) {
+        QoSSlotAssignment *qos = &qos_slots[i];
+        uint32_t weight = (16 - qos->priority);
+        uint32_t slots_to_assign = (weight * qos->slot_count) / total_weight;
+
+        for (uint32_t j = 0; j < slots_to_assign && slot_idx < slot_count; j++) {
+            if (qos->slot_count < MAX_QOS_SLOTS) {
+                qos->slot_ids[qos->slot_count++] = slots[slot_idx++];
             }
         }
     }

@@ -11,6 +11,7 @@
 #define SKYNET_DISCARD_MS 500   // Discard old packets (ms)
 #define SKYNET_MIN_SLOTS 1      // Minimum slots per bearer
 #define SKYNET_MAX_SLOTS 10     // Maximum slots per bearer
+#define MAX_QOS_SLOTS 10
 
 // Bearer QoS parameters (inspired by LTE QCI)
 typedef struct {
@@ -19,6 +20,14 @@ typedef struct {
     uint8_t reliability;     // 0 (best-effort), 1 (reliable)
     uint32_t min_slots;      // Minimum TDMA slots
 } SkyNetBearerQoS;
+
+typedef struct {
+    uint32_t npg_id;
+    uint8_t qos;
+    uint32_t slot_count;
+    uint32_t slot_ids[MAX_QOS_SLOTS];
+    uint8_t priority;
+} QoSSlotAssignment;
 
 // Bearer state
 typedef struct {
@@ -45,7 +54,8 @@ void skynet_convergence_init(SkyNetConvergenceEntity *entity, uint32_t node_id);
 int skynet_convergence_process(SkyNetConvergenceEntity *entity, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t recv_time); // Process incoming message (reordering, deduplication)
 int skynet_convergence_deliver(SkyNetConvergenceEntity *entity, SkyNetBearer *bearer, SkyNetMessage *delivered_msg); // Deliver reordered messages to upper layer
 int skynet_convergence_request_slots(SkyNetConvergenceEntity *entity, uint32_t bearer_id, uint32_t npg_id, uint8_t qos); // Request slots for a bearer
-void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t *slots, uint32_t slot_count); // Schedule slots across bearers
+void skynet_convergence_schedule_slots(QoSSlotAssignment *qos_slots, uint32_t *slots, uint32_t qos_slot_count, uint32_t slot_count);
+//void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t *slots, uint32_t slot_count); // Schedule slots across bearers
 int skynet_convergence_preempt_slots(SkyNetConvergenceEntity *entity, uint32_t high_priority_bearer_id); // Preempt low-priority slots
 int skynet_convergence_add_bearer(SkyNetConvergenceEntity *entity, uint32_t npg_id, uint8_t qos); // Add a new bearer
 void skynet_convergence_remove_bearer(SkyNetConvergenceEntity *entity, uint32_t bearer_id); // Remove a bearer
