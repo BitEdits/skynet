@@ -358,9 +358,9 @@ dynamic network topologies.
 
 \subsection{Reliability and Reordering}
 TDMA networks may deliver packets out of order due to slot scheduling or retransmissions,
-particularly for reliable traffic (e.g., \texttt{reliability=1}). The \texttt{SkyNetBearer} includes
+particularly for reliable traffic (e.g., \texttt{reliability=1}). The bearer includes
 a \texttt{reorder\_queue} and tracks \texttt{expected\_seq\_no} and \texttt{last\_delivered} to
-reorder packets and ensure reliable delivery. The \texttt{SkyNetConvergenceEntity} coordinates
+reorder packets and ensure reliable delivery. The entity coordinates
 reorder checks across bearers using \texttt{last\_reorder\_time\_us}, minimizing overhead. This
 mechanism is critical for applications requiring guaranteed delivery, such as C2 or control
 messages, and enhances robustness compared to flat structures, which lack per-flow reordering
