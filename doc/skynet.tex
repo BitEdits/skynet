@@ -2,10 +2,9 @@
 \usepackage{listings}
 \lstset{basicstyle=\footnotesize\ttfamily}
 
-\lefthyphenmin=1
+\lefthyphenmin=2
 \hyphenpenalty=100
-\tolerance=10000
-\emergencystretch=1em
+\tolerance=2000
 \hfuzz=2pt
 \vfuzz=2pt
 
@@ -45,13 +44,10 @@ dynamic resource allocation for mission-critical communications.
 Link32 and Skynet are designed with the following properties:
 \begin{itemize}
     \item \textbf{Implementation}: Written in C99 for portability and performance.
-    \item \textbf{Message Size}: Minimum 32-byte header (48 bytes with AES-256-GCM tag) to optimize
-          bandwidth.
-    \item \textbf{Security}: ECDH key exchange over secp384r1, AES-256-GCM encryption for all
-          messages.
+    \item \textbf{Message Size}: Minimum 32-byte header (48 bytes with AES-256-GCM tag) to optimize bandwidth.
+    \item \textbf{Security}: ECDH key exchange over secp384r1, AES-256-GCM encryption for all messages.
     \item \textbf{Latency}: Microsecond-precision timing using monotonic clocks and non-blocking I/O.
-    \item \textbf{Concurrency}: Lock-free atomic operations (CMPXCHG) for thread-safe queue
-          management.
+    \item \textbf{Concurrency}: Lock-free atomic operations (CMPXCHG) for thread-safe queue management.
     \item \textbf{Networking}: UDP multicast with topic-based subscriptions.
     \item \textbf{Swarm Scalability}: Supports large-scale drone swarms via dynamic slot allocation.
     \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
@@ -101,7 +97,7 @@ typedef struct {
 \subsection{Message Types}
 The protocol defines seven message types, as shown in Table 1.
 
-\begin{table}
+\begin{table}[h]
 \centering
 \caption{Link32 Message Types}
 \begin{tabular}{clp{7cm}}
@@ -110,11 +106,11 @@ The protocol defines seven message types, as shown in Table 1.
 \hline
 0 & Key Exchange & Exchanges ECC public keys for ECDH session setup. \\
 1 & Slot Request & Requests a TDMA slot from the server. \\
-2 & Chat & Sends tactical chat messages. \\
-3 & Ack & Acknowledges slot assignments or control messages. \\
-4 & Waypoint & Specifies navigation waypoints for C2. \\
-5 & Status & Reports position, velocity, or sensor data (e.g., PLI). \\
-6 & Formation & Coordinates swarm formations. \\
+2 & Chat         & Sends tactical chat messages. \\
+3 & Ack          & Acknowledges slot assignments or control messages. \\
+4 & Waypoint     & Specifies navigation waypoints for C2. \\
+5 & Status       & Reports position, velocity, or sensor data (e.g., PLI). \\
+6 & Formation    & Coordinates swarm formations. \\
 \hline
 \end{tabular}
 \end{table}
@@ -122,21 +118,21 @@ The protocol defines seven message types, as shown in Table 1.
 \subsection{Multicast Topics}
 Link32 uses multicast topics mapped to IP multicast groups, as in Table 2.
 
-\begin{table}
+\begin{table}[h]
 \centering
 \caption{Multicast Topics}
 \begin{tabular}{cllp{5cm}}
 \hline
 \textbf{NPG} & \textbf{Name} & \textbf{Multicast} & \textbf{Purpose} \\
 \hline
-1 & npg\_control & 239.255.0.1 & Network control (key exchange, slot requests). \\
-6 & npg\_pli & 239.255.0.6 & Position information (status). \\
-7 & npg\_surveillance & 239.255.0.7 & Sensor data forwarding. \\
-29 & npg\_chat & 239.255.0.29 & Tactical chat and acknowledgments. \\
-100 & npg\_c2 & 239.255.0.100 & C2 (waypoints, formations). \\
-101 & npg\_alerts & 239.255.0.101 & Network alerts and self-healing. \\
-102 & npg\_logistics & 239.255.0.102 & Logistical coordination (status, chat). \\
-103 & npg\_coord & 239.255.0.103 & Swarm Coordination (chat, waypoints). \\
+1   & npg\_control      & 239.255.0.1   & Network control (key exchange, slot requests). \\
+6   & npg\_pli          & 239.255.0.6   & Position information (status). \\
+7   & npg\_surveillance & 239.255.0.7   & Sensor data forwarding. \\
+29  & npg\_chat         & 239.255.0.29  & Tactical chat and acknowledgments. \\
+100 & npg\_c2           & 239.255.0.100 & C2 (waypoints, formations). \\
+101 & npg\_alerts       & 239.255.0.101 & Network alerts and self-healing. \\
+102 & npg\_logistics    & 239.255.0.102 & Logistical coordination (status, chat). \\
+103 & npg\_coord        & 239.255.0.103 & Swarm Coordination (chat, waypoints). \\
 \hline
 \end{tabular}
 \end{table}
@@ -177,7 +173,7 @@ Security mechanisms include:
 \newpage
 \subsection{Subscriptions}
 Nodes subscribe to topics based on roles, as shown in Table 3:
-\begin{table}
+\begin{table}[h]
 \centering
 \caption{Role-Based Subscriptions}
 \begin{tabular}{llp{4cm}}
@@ -259,11 +255,11 @@ Joined multicast group 239.255.0.6 (NPG 6).
 Sent key exchange message to server.
 Sent slot request message to server.
 Received slot assignment: slot=0.
-Joined slot multicast group 239.255.1.0.
+Joined slot group 2399540.1.
 Sent status message: multicast=239.255.1.0,
-                    pos=[0.1, 0.1, 0.1],
-                    vel=[0.0, 0.0, 0.0],
-                    seq=2.
+                            pos=[0.1, 0.1, 0.1],
+                            vel=[0.0, 0.0, 0.0],
+                            seq=2.
 \end{lstlisting}
 
 \newpage
@@ -285,7 +281,7 @@ skynet_encrypt <sender> <recipient> <file>
 \subsubsection*{Message Decryption}
 Decrypts \texttt{<file.sky>}.
 \begin{lstlisting}
-skynet_decrypt <sender> <recipient> <file.sky>
+skynet_decoder <sender> <recipient> <file.sky>
 \end{lstlisting}
 
 \subsubsection*{Skynet Server}
@@ -330,6 +326,16 @@ cannot adapt to node arrivals or departures, leading to inefficient resource uti
 hierarchy overcomes these limitations by introducing bearers for flow isolation and entities for
 node-level coordination, enabling dynamic and scalable QoS management.
 
+\begin{lstlisting}
+typedef struct {
+    uint32_t npg_id;
+    uint8_t qos;
+    uint32_t slot_count;
+    uint32_t slot_ids[MAX_QOS_SLOTS];
+    uint8_t priority;
+} QoSSlotAssignment;
+\end{lstlisting}
+
 \subsection{Hierarchical QoS Structure}
 The 3-level hierarchy separates concerns into QoS, Bearer, and Entity layers, each addressing
 specific aspects of network management. The \texttt{SkyNetBearerQoS} structure defines QoS
@@ -340,6 +346,38 @@ QoS parameters, assigned slots, and state for reordering and reliability. The
 \texttt{SkyNetConvergenceEntity} aggregates bearers for a single node, managing slot requests and
 coordinating resource allocation. This modular design ensures scalability, flexibility, and
 robustness, outperforming flat structures by providing flow isolation and dynamic adaptation.
+
+\begin{lstlisting}
+typedef struct {
+    uint8_t priority;        // 1-15 (1 = highest)
+    uint32_t delay_budget_ms;// Delay tolerance (ms)
+    uint8_t reliability;     // 0 (best-effort), 1 (reliable)
+    uint32_t min_slots;      // Minimum TDMA slots
+} SkyNetBearerQoS;
+\end{lstlisting}
+
+\begin{lstlisting}
+typedef struct {
+    uint32_t bearer_id;      // Unique bearer ID
+    SkyNetBearerQoS qos;     // QoS parameters
+    uint32_t node_id;        // Owning node
+    uint32_t npg_id;         // Associated NPG
+    uint32_t assigned_slots[SKYNET_MAX_SLOTS]; // Assigned slot IDs
+    uint32_t slot_count;     // Number of assigned slots
+    SkyNetMessage reorder_queue[SKYNET_REORDER_SIZE];
+    uint32_t expected_seq_no;// Next expected sequence number
+    uint32_t last_delivered; // Last delivered sequence number
+    uint64_t last_reorder_time_us; // Last reorder check
+} SkyNetBearer;
+\end{lstlisting}
+
+\begin{lstlisting}
+typedef struct {
+    SkyNetBearer bearers[SKYNET_MAX_BEARERS]; // Active bearers
+    uint32_t bearer_count;   // Number of active bearers
+    atomic_uint slot_requests_pending; // Pending slot requests
+} SkyNetConvergenceEntity;
+\end{lstlisting}
 
 \subsection{Granular QoS Control}
 Tactical networks handle diverse traffic types, such as C2, position location information (PLI), and
@@ -401,13 +439,57 @@ such as priority and delay budget, ensuring compatibility with established stand
 reduces design risk, enhances interoperability with telecom systems, and provides a familiar
 framework for engineers, making it easier to develop and maintain the system.
 
-In conclusion, the 3-level QoS, Bearer, Entity hierarchy is a robust and scalable solution for
-managing QoS in Skynet’s TDMA-based tactical network. It addresses critical requirements for
-granular control, per-node resource management, reliable delivery, dynamic slot allocation, and
-scalability, particularly for swarm drone coordination. Drawing on LTE QCI principles, it ensures
-military-grade performance with sub-50ms latency and reliable communication for mission-critical
-applications, outperforming alternatives like flat or centralized designs in dynamic, resilient
-scenarios.
+\subsection{MQTT Compatibility}
+Skynet’s convergence layer maps its QoS levels to MQTT’s QoS semantics (ISO/IEC 20922:2016) and LTE’s
+QCI framework (3GPP TS 23.203, Release 15), enabling compatibility with both standards for tactical
+communications. MQTT defines three QoS levels:
+\begin{itemize}
+    \item \textbf{QoS 0 (At Most Once)}: Best-effort delivery with no acknowledgment or retransmission.
+          Suitable for non-critical data like tactical chat where packet loss is tolerable.
+    \item \textbf{QoS 1 (At Least Once)}: Guarantees at least one delivery with acknowledgment (ACK),
+          allowing duplicates. Used for data requiring delivery, such as position location information
+          (PLI), where duplicates are acceptable.
+    \item \textbf{QoS 2 (Exactly Once)}: Ensures exactly one delivery via a four-way handshake
+          (\texttt{PUBLISH}, \texttt{PUBREC}, \texttt{PUBREL}, \texttt{PUBCOMP}). Critical for
+          command and control (C2) messages requiring no loss or duplication.
+\end{itemize}
+Skynet implements these using its \texttt{SkyNetBearerQoS} and \texttt{SkyNetBearer} structures,
+configured via \texttt{skynet\_convergence\_init} and processed in
+\texttt{skynet\_convergence\_process\_message}. QoS 0 skips \texttt{reorder\_queue} and ACKs, QoS 1
+uses ACKs (\texttt{SKYNET\_MSG\_ACK}) with retransmission on timeout (100ms), and QoS 2 employs a
+handshake with strict ordering and deduplication via \texttt{seq\_no}. All Network Protocol Groups
+(NPGs) and message types are mapped to QoS levels, as shown in Table 4.
+
+\begin{table}[h]
+\centering
+\caption{Skynet QoS Mapping to MQTT and LTE QCI}
+\tiny
+\begin{tabular}{cllllll}
+\hline
+\textbf{QoS} & \textbf{Priority} & \textbf{NPG} & \textbf{QCI} & \textbf{Budget} & \textbf{Slots} & \textbf{Type} \\
+\hline
+0 & 15 & 29  & QCI 9 & 300ms & 1 & \texttt{CHAT} \\
+0 & 14 & 102 & QCI 9 & 300ms & 1 & \texttt{CHAT, STATUS} \\
+0 & 13 & 103 & QCI 9 & 300ms & 1 & \texttt{CHAT, WAYPOINT} \\
+1 & 7  & 6   & QCI 7 & 100ms & 2 & \texttt{STATUS} \\
+1 & 6  & 7   & QCI 7 & 100ms & 2 & \texttt{STATUS} \\
+2 & 3  & 1   & QCI 5 & 50ms  & 3 & \texttt{KEY\_EXCHANGE, SLOT\_REQUEST, ACK} \\
+2 & 2  & 100 & QCI 3 & 50ms  & 3 & \texttt{WAYPOINT, FORMATION, ACK} \\
+2 & 1  & 101 & QCI 5 & 50ms  & 3 & \texttt{ACK, STATUS} \\
+\hline
+\end{tabular}
+\end{table}
+
+This mapping ensures military-grade performance: QoS 2 meets sub-50ms latency for C2 (\texttt{npg\_c2},
+NPG 100) and control (\texttt{npg\_control}, NPG 1), QoS 1 supports reliable PLI (\texttt{npg\_pli},
+NPG 6) with 100ms latency, and QoS 0 optimizes bandwidth for chat (\texttt{npg\_chat}, NPG 29). The
+\texttt{SkyNetConvergenceEntity} dynamically allocates slots via Weighted Fair Queuing, prioritizing
+high-QoS bearers, while \texttt{reorder\_queue} ensures reliability for QoS 1 and 2, aligning with
+LTE QCI’s packet error loss rates (e.g., 10$^{-6}$ for QCI 5).
+
+In conclusion, the 3-level hierarchy, inspired by LTE QCI, enables Skynet to replicate MQTT’s QoS
+semantics, ensuring scalable, low-latency, and reliable communication for swarm drone coordination and
+other tactical applications.
 
 \section{Conclusion}
 Link32 and Skynet provide a robust framework for tactical communication, combining low-latency,
