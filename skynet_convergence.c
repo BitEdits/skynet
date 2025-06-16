@@ -67,6 +67,44 @@ void skynet_convergence_init(SkyNetConvergenceEntity *entity, uint32_t node_id) 
     }
 }
 
+void skynet_convergence_init_bearers(SkyNetConvergenceEntity *entity, uint32_t node_id) {
+    for (uint32_t i = 0; i < SKYNET_MAX_BEARERS; i++) {
+        SkyNetBearer *bearer = &entity->bearers[i];
+        bearer->bearer_id = i;
+        bearer->node_id = node_id;
+        // Default QoS based on NPG
+        switch (bearer->npg_id) {
+            case SKYNET_NPG_CHAT: // NPG 103
+                bearer->qos.priority = 15;
+                bearer->qos.delay_budget_ms = 300;
+                bearer->qos.reliability = 0;
+                bearer->qos.min_slots = 1;
+                break;
+            case SKYNET_NPG_PLI: // NPG 6
+                bearer->qos.priority = 7;
+                bearer->qos.delay_budget_ms = 100;
+                bearer->qos.reliability = 1;
+                bearer->qos.min_slots = 2;
+                break;
+            case SKYNET_NPG_CONTROL: // NPG 1
+            case SKYNET_NPG_C2: // NPG 100
+                bearer->qos.priority = 3;
+                bearer->qos.delay_budget_ms = 50;
+                bearer->qos.reliability = 1;
+                bearer->qos.min_slots = 3;
+                break;
+            default:
+                bearer->qos.priority = 9;
+                bearer->qos.delay_budget_ms = 200;
+                bearer->qos.reliability = 0;
+                bearer->qos.min_slots = 1;
+        }
+    }
+    entity->bearer_count = 0;
+    atomic_store(&entity->slot_requests_pending, 0);
+}
+
+
 int skynet_convergence_add_bearer(SkyNetConvergenceEntity *entity, uint32_t npg_id, uint8_t qos) {
     if (entity->bearer_count >= SKYNET_MAX_BEARERS) {
         fprintf(stderr, "Max bearers reached\n");
@@ -96,37 +134,46 @@ void skynet_convergence_remove_bearer(SkyNetConvergenceEntity *entity, uint32_t 
     bearer->last_delivered = UINT32_MAX;
 }
 
-int skynet_convergence_process(SkyNetConvergenceEntity *entity, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t recv_time) {
-    // Find bearer by npg_id
-    SkyNetBearer *bearer = NULL;
-    for (uint32_t i = 0; i < entity->bearer_count; i++) {
-        if (entity->bearers[i].npg_id == msg->npg_id) {
-            bearer = &entity->bearers[i];
+void skynet_convergence_process_message(SkyNetConvergenceEntity *entity, SkyNetMessage *msg) {
+    SkyNetBearer *bearer = NULL; //find_bearer(entity, msg->npg_id, msg->node_id);
+    if (!bearer) return;
+    switch (bearer->qos.reliability) {
+        case 0: // QoS 0: No ACK, no reordering
+//            deliver_message(msg);
             break;
-        }
+        case 1: // QoS 1 or 2: Reliable
+            if (bearer->qos.priority <= 8) { // QoS 1: Allow duplicates
+/*
+                if (enqueue_message(bearer->reorder_queue, msg)) {
+                    deliver_message(msg);
+                    send_ack(bearer, msg->seq_no, SKYNET_MSG_ACK);
+                }
+*/
+            } else { // QoS 2: Strict ordering, no duplicates
+                if (msg->seq_no == bearer->expected_seq_no) {
+/*
+                    enqueue_message(bearer->reorder_queue, msg);
+                    deliver_message(msg);
+                    send_ack(bearer, msg->seq_no, SKYNET_MSG_ACK); // PUBREC
+                    if (receive_ack(bearer, msg->seq_no, SKYNET_MSG_ACK)) { // PUBREL
+                        send_ack(bearer, msg->seq_no, SKYNET_MSG_ACK); // PUBCOMP
+                        bearer->expected_seq_no++;
+                        bearer->last_delivered = msg->seq_no;
+                    }
+*/
+                } else {
+                    // Buffer out-of-order messages
+//                    enqueue_message(bearer->reorder_queue, msg);
+                }
+            }
+            break;
     }
-    if (!bearer) {
-        fprintf(stderr, "No bearer for npg_id=%u\n", msg->npg_id);
-        return -1;
+/*
+    // Check for retransmission
+    if (bearer->qos.reliability && timeout_expired(bearer->last_reorder_time_us, bearer->qos.delay_budget_ms * 1000)) {
+        retransmit_pending(bearer);
     }
-
-    // Deduplication
-    if (msg->seq_no <= bearer->last_delivered) {
-        fprintf(stderr, "Duplicate or old message: seq_no=%u, last_delivered=%u\n", msg->seq_no, bearer->last_delivered);
-        return -1;
-    }
-
-    // Reordering
-    uint32_t queue_idx = msg->seq_no % SKYNET_REORDER_SIZE;
-    if (msg->seq_no == bearer->expected_seq_no) {
-        bearer->expected_seq_no++;
-        bearer->last_delivered = msg->seq_no;
-        return 0; // Deliver immediately
-    } else if (msg->seq_no > bearer->expected_seq_no) {
-        bearer->reorder_queue[queue_idx] = *msg;
-        return 1; // Queued for reordering
-    }
-    return -1; // Out of window
+*/
 }
 
 int skynet_convergence_deliver(SkyNetConvergenceEntity *entity, SkyNetBearer *bearer, SkyNetMessage *delivered_msg) {
