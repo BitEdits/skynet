@@ -1,8 +1,8 @@
 PATH=$PATH:.
 
-rm -f skynet skynet_client skynet_decrypt skynet_encrypt skynet_keygen
+rm -f skynet skynet_client skynet_decrypt skynet_encrypt skynet_keygen skynet.txt.sky skynet.txt.sky.dec
 
-gcc -o skynet          skynet.c         skynet_proto.c -lcrypto
+gcc -o skynet          skynet.c         skynet_proto.c skynet_convergence.c -pthread -lcrypto
 gcc -o skynet_client   skynet_client.c  skynet_proto.c -lcrypto
 gcc -o skynet_decrypt  skynet_decrypt.c skynet_proto.c -lcrypto
 gcc -o skynet_encrypt  skynet_encrypt.c skynet_proto.c -lcrypto
@@ -21,5 +21,5 @@ skynet_keygen client           --client
 
 cp ~/.skynet/ecc/secp384r1/*.ec_pub ~/.skynet_client/ecc/secp384r1/
 
-skynet_encrypt client server 1
-skynet_decrypt client server 1.sky
+skynet_encrypt client server skynet.txt
+skynet_decrypt client server skynet.txt.sky
