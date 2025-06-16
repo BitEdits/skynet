@@ -4,17 +4,20 @@
 
 \begin{document}
 
-\title{Skynet: A Tactical Communication Protocol and Reference Implementation}
+\title{A Tactical Communication Protocol Link32 \\ and Reference Implementation Skynet}
 \author{Namdak Tonpa}
 \date{June 15, 2025}
 \maketitle
 
 \begin{abstract}
-Link32 is a tactical communication protocol designed for low-latency, secure,
-and scalable data exchange in contested environments, supporting swarm coordination,
-real-time position location information (PLI), command and control (C2), and tactical
-chat over UDP-based multicast networks.
-We present its design and reference implementation named Skynet.
+Link32 is a tactical communication protocol designed for low-latency, secure, and scalable data
+exchange in contested environments, enabling swarm drone coordination, real-time position location
+information (PLI), command and control (C2), and tactical chat over UDP-based multicast networks.
+Skynet, its reference implementation, is a lightweight C99 framework inspired by LTE’s QoS Class
+Identifier (QCI) framework, tailored for military applications and resource-constrained devices
+such as drones and embedded systems. With minimal dependencies and a focus on portability, Skynet
+supports dynamic TDMA slot management, AES-256-GCM encryption, and lock-free concurrency, ensuring
+robust performance in mission-critical scenarios.
 \end{abstract}
 
 \newpage
@@ -22,23 +25,28 @@ We present its design and reference implementation named Skynet.
 
 \newpage
 \section{Introduction}
-Link32 is a tactical communication protocol inspired by standards such as VMF, LINK16,
-TSM, SRW, and MQTT, tailored for military applications requiring robust, low-latency,
-and secure data exchange in contested environments. It facilitates swarm coordination,
-real-time position location information (PLI), command and control (C2), and tactical
-chat using UDP-based multicast networks. Skynet is the reference server implementation
-of Link32, developed in C99 with minimal dependencies to ensure portability and
- performance on resource-constrained devices.
+Link32 is a tactical communication protocol inspired by standards such as VMF, LINK16, TSM, SRW, and
+MQTT, tailored for military applications requiring robust, low-latency, and secure data exchange in
+contested environments. It facilitates swarm drone coordination, real-time position location
+information (PLI), command and control (C2), and tactical chat using UDP-based multicast networks.
+Skynet is the reference server implementation of Link32, developed in C99 with minimal dependencies
+to ensure portability and performance on resource-constrained devices. Its convergence layer draws
+inspiration from LTE’s QoS Class Identifier (QCI) framework, enabling granular QoS control and
+dynamic resource allocation for mission-critical communications.
 
 \subsection{Properties}
 Link32 and Skynet are designed with the following properties:
 \begin{itemize}
     \item \textbf{Implementation}: Written in C99 for portability and performance.
-    \item \textbf{Message Size}: Minimum 32-byte header (48 bytes with AES-256-GCM tag) to optimize bandwidth.
-    \item \textbf{Security}: ECDH key exchange over secp384r1, AES-256-GCM encryption for all messages.
+    \item \textbf{Message Size}: Minimum 32-byte header (48 bytes with AES-256-GCM tag) to optimize
+          bandwidth.
+    \item \textbf{Security}: ECDH key exchange over secp384r1, AES-256-GCM encryption for all
+          messages.
     \item \textbf{Latency}: Microsecond-precision timing using monotonic clocks and non-blocking I/O.
-    \item \textbf{Concurrency}: Lock-free atomic operations (CMPXCHG) for thread-safe queue management.
+    \item \textbf{Concurrency}: Lock-free atomic operations (CMPXCHG) for thread-safe queue
+          management.
     \item \textbf{Networking}: UDP multicast with topic-based subscriptions.
+    \item \textbf{Swarm Scalability}: Supports large-scale drone swarms via dynamic slot allocation.
     \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
     \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
     \item \textbf{Threat Model}: Prioritizes confidentiality and integrity, no non-repudiation.
@@ -59,19 +67,20 @@ Link32 adheres to the following design principles:
 \section{Link32 Protocol}
 
 \subsection{S-Message Format}
-The Link32 message structure, \texttt{SkyNetMessage}, is compact for large-scale swarm communication:
+The Link32 message structure, \texttt{SkyNetMessage}, is compact for large-scale swarm
+communication:
 \begin{lstlisting}
 typedef struct {
-    uint8_t version : 4;   // Protocol version (current: 1)
-    uint8_t type : 4;      // Message type (0-6)
-    uint8_t qos : 4;       // Quality of Service (0-3)
-    uint8_t hop_count : 4; // Hop count for routing (0-15)
-    uint32_t npg_id;       // Topic identifier (1-103)
-    uint32_t node_id;      // Sender node ID (FNV-1a hash)
-    uint32_t seq_no;       // Sequence number for deduplication
-    uint8_t iv[16];        // AES-256-GCM initialization vector
-    uint16_t payload_len;  // Payload length (0-32767)
-    uint8_t payload[MAX_BUFFER]; // Encrypted payload + 16-byte GCM tag
+  uint8_t version : 4;    // Protocol version (current: 1)
+  uint8_t type : 4;       // Message type (0-6)
+  uint8_t qos : 4;        // Quality of Service (0-3)
+  uint8_t hop_count : 4;  // Hop count for routing (0-15)
+  uint32_t npg_id;        // Topic identifier (1-103)
+  uint32_t node_id;       // Sender node ID (FNV-1a hash)
+  uint32_t seq_no;        // Sequence number for deduplication
+  uint8_t iv[16];         // AES-256-GCM initialization vector
+  uint16_t payload_len;   // Payload length (0-32767)
+  uint8_t payload[MAX_BUFFER]; // Encrypted payload + 16-byte GCM tag
 } SkyNetMessage;
 \end{lstlisting}
 \begin{itemize}
@@ -85,7 +94,8 @@ The protocol defines seven message types, as shown in Table~\ref{tab:msgtypes}:
 \begin{table}[h]
 \centering
 \caption{Link32 Message Types}
-\begin{tabular}{cll}
+\label{tab:msgtypes}
+\begin{tabular}{clp{7cm}}
 \hline
 \textbf{ID} & \textbf{Type} & \textbf{Description} \\
 \hline
@@ -105,7 +115,8 @@ Link32 uses multicast topics mapped to IP multicast groups, as listed in Table~\
 \begin{table}[h]
 \centering
 \caption{Multicast Topics}
-\begin{tabular}{clll}
+\label{tab:topics}
+\begin{tabular}{cllp{5cm}}
 \hline
 \textbf{NPG} & \textbf{Name} & \textbf{Multicast} & \textbf{Purpose} \\
 \hline
@@ -124,12 +135,15 @@ Link32 uses multicast topics mapped to IP multicast groups, as listed in Table~\
 \subsection{Slot Management}
 Link32 employs a Time Division Multiple Access (TDMA)-like slot manager to minimize collisions:
 \begin{itemize}
-    \item \textbf{Slot Array}: Fixed-size array (\texttt{slots[SLOT\_COUNT=256]}) in \texttt{ServerState}.
-    \item \textbf{Dynamic Topics}: Each slot creates a temporary multicast group (239.255.1.<slot\_id \% 256>).
+    \item \textbf{Slot Array}: Fixed-size array (\texttt{slots[SLOT\_COUNT=256]}) in
+          \texttt{ServerState}.
+    \item \textbf{Dynamic Topics}: Each slot creates a temporary multicast group
+          (239.255.1.<slot\_id \% 256>).
     \item \textbf{Allocation}: First-come, first-serve with no timeouts.
     \item \textbf{Timing}: Slots cycle every \texttt{TIME\_SLOT\_INTERVAL\_US=1000$\mu$s}.
 \end{itemize}
-Clients send \texttt{SKYNET\_MSG\_SLOT\_REQUEST} to NPG 1, and the server assigns slots via \texttt{SKYNET\_MSG\_ACK}.
+Clients send \texttt{SKYNET\_MSG\_SLOT\_REQUEST} to NPG 1, and the server assigns slots via
+\texttt{SKYNET\_MSG\_ACK}.
 
 \subsection{Deduplication}
 A fixed-size circular buffer (\texttt{seq\_cache}) prevents message loops:
@@ -146,9 +160,13 @@ Security mechanisms include:
 \begin{itemize}
     \item \textbf{Key Exchange}: ECDH over secp384r1 for 256-bit AES keys.
     \item \textbf{Encryption}: AES-256-GCM with 16-byte IV and 16-byte tag.
-    \item \textbf{Key Storage}: Server: \texttt{\textasciitilde/.skynet/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}}; Client: \texttt{\textasciitilde/.skynet\_client/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}}.
+    \item \textbf{Key Storage}: Server:
+          \texttt{\textasciitilde/.skynet/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}};
+          Client:
+          \texttt{\textasciitilde/.skynet\_client/ecc/secp384r1/<node\_hash>.\{ec\_priv,ec\_pub\}}.
     \item \textbf{Key Derivation}: HKDF-SHA256 for AES keys.
-    \item \textbf{Self-Sent Handling}: Skips messages where \texttt{msg->node\_id == state->node\_id}.
+    \item \textbf{Self-Sent Handling}: Skips messages where
+          \texttt{msg->node\_id == state->node\_id}.
 \end{itemize}
 
 \subsection{Subscriptions}
@@ -157,7 +175,8 @@ Nodes subscribe to topics based on roles, as shown in Table~\ref{tab:subs}:
 \begin{table}[h]
 \centering
 \caption{Role-Based Subscriptions}
-\begin{tabular}{llp{8cm}}
+\label{tab:subs}
+\begin{tabular}{llp{7cm}}
 \hline
 \textbf{Role} & \textbf{NPGs} & \textbf{Purpose} \\
 \hline
@@ -187,7 +206,7 @@ To build Skynet:
 $ git clone git@github.com:BitEdits/skynet
 $ cd skynet
 $ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
-$ gcc -o skynet skynet.c skynet_proto.c -pthread -lcrypto
+$ gcc -o skynet skynet.c skynet_proto.c skynet_convergence.c -pthread -lcrypto
 \end{lstlisting}
 
 \subsection{Installation}
@@ -198,7 +217,7 @@ Generated keys for node npg_control (hash: 06c5bc52) in /secp/
 Generated keys for node npg_pli (hash: c9aef284) in /secp/
 Generated keys for node npg_surveillance (hash: 4d128cdc) in /secp/
 Generated keys for node npg_chat (hash: 9c69a767) in /secp/
-Generated keys for node npg_c2 (hash: 89f28794) in cc/secp/
+Generated keys for node npg_c2 (hash: 89f28794) in /secp/
 Generated keys for node npg_alerts (hash: 9f456bca) in /secp/
 Generated keys for node npg_logistics (hash: 542105cc) in /secp/
 Generated keys for node npg_coord (hash: e46c0c22) in /secp/
@@ -208,7 +227,8 @@ Generated keys for node client (hash: 8f929c1e) in /client/secp/
 \end{lstlisting}
 
 \subsection{Server Operation}
-The server binds to UDP port 6566, joins multicast groups, and processes messages using a global queue. Example output:
+The server binds to UDP port 6566, joins multicast groups, and processes messages using a global
+queue. Example output:
 \begin{lstlisting}
 # skynet server
 Node 40ac3dd2 bound to 0.0.0.0:6566.
@@ -224,7 +244,8 @@ Message sent from=8f929c1e, to=6, seq=3, multicast=239.255.1.0, latency=36643.
 \end{lstlisting}
 
 \subsection{Client Operation}
-The client joins topic-specific multicast groups and sends key exchange, slot requests, and status messages. Example output:
+The client joins topic-specific multicast groups and sends key exchange, slot requests, and status
+messages. Example output:
 \begin{lstlisting}
 # skynet_client client
 Node 8f929c1e connecting to port 6566.
@@ -235,9 +256,9 @@ Sent slot request message to server.
 Received slot assignment: slot=0.
 Joined slot multicast group 239.255.1.0.
 Sent status message: multicast=239.255.1.0,
-                     pos=[0.1, 0.1, 0.1],
-                     vel=[0.0, 0.0, 0.0],
-                     seq=2.
+                    pos=[0.1, 0.1, 0.1],
+                    vel=[0.0, 0.0, 0.0],
+                    seq=2.
 \end{lstlisting}
 
 \subsection{Usage}
@@ -281,129 +302,128 @@ skynet_client <node>
     \item \textbf{Deduplication}: \texttt{SEQ\_CACHE\_SIZE=1024} may cause collisions.
 \end{itemize}
 
-\section{Convergence Archtecture}
-The Skynet system's convergence layer employs a 3-level structural hierarchy comprising
-Quality of Service (QoS), Bearer, and Entity components. This design is driven by the
-need for granular QoS control, per-node resource management, reliable packet delivery,
-dynamic slot allocation, and scalability in a Time Division Multiple Access (TDMA)-based
-tactical network. Inspired by the Long-Term Evolution (LTE) QoS Class Identifier (QCI)
-framework, the hierarchy ensures military-grade performance, including latency below
-50ms for command-and-control (C2) traffic and reliable delivery for critical communications.
-Compared to alternative designs, such as flat or centralized structures, this approach
-excels in dynamic, resilient scenarios, providing robust and scalable QoS management.
+\section{Convergence Architecture}
+The Skynet system's convergence layer employs a 3-level structural hierarchy comprising Quality of
+Service (QoS), Bearer, and Entity components. This design is driven by the need for granular QoS
+control, per-node resource management, reliable packet delivery, dynamic slot allocation, and
+scalability in a Time Division Multiple Access (TDMA)-based tactical network. Inspired by the
+Long-Term Evolution (LTE) QoS Class Identifier (QCI) framework, the hierarchy ensures military-grade
+performance, including latency below 50ms for command-and-control (C2) traffic and reliable delivery
+for critical communications, such as swarm drone coordination. Compared to alternative designs, such
+as flat or centralized structures, this approach excels in dynamic, resilient scenarios, providing
+robust and scalable QoS management.
 
 \subsection{Flat QoS Structure}
-A flat QoS structure assigns slots directly to Network Protocol Groups (NPGs) based
-on their QoS profiles, without intermediate bearer or entity layers. For example,
-an NPG like \texttt{SKYNET\_NPG\_C2} might be statically allocated three slots with
-QoS level 3. While simpler and requiring less memory, this approach lacks per-node
-isolation, making it unsuitable for dynamic networks with multiple nodes sharing
-the same NPG. It also complicates reliable delivery, as there is no mechanism for
-per-flow reordering or sequence tracking. Additionally, static slot assignments
-cannot adapt to node arrivals or departures, leading to inefficient resource
-utilization. The 3-level hierarchy overcomes these limitations by introducing
-bearers for flow isolation and entities for node-level coordination, enabling
- dynamic and scalable QoS management.
+A flat QoS structure assigns slots directly to Network Protocol Groups (NPGs) based on their QoS
+profiles, without intermediate bearer or entity layers. For example, an NPG like
+\texttt{SKYNET\_NPG\_C2} might be statically allocated three slots with QoS level 3. While simpler
+and requiring less memory, this approach lacks per-node isolation, making it unsuitable for dynamic
+networks with multiple nodes sharing the same NPG. It also complicates reliable delivery, as there is
+no mechanism for per-flow reordering or sequence tracking. Additionally, static slot assignments
+cannot adapt to node arrivals or departures, leading to inefficient resource utilization. The 3-level
+hierarchy overcomes these limitations by introducing bearers for flow isolation and entities for
+node-level coordination, enabling dynamic and scalable QoS management.
 
 \subsection{Hierarchical QoS Structure}
-The 3-level hierarchy separates concerns into QoS, Bearer, and Entity layers,
-each addressing specific aspects of network management. The \texttt{SkyNetBearerQoS}
-structure defines QoS parameters such as priority (1--15, where 1 is highest),
-delay budget (in milliseconds), reliability (best-effort or reliable),
-and minimum TDMA slots, allowing precise service differentiation.
-The \texttt{SkyNetBearer} represents a logical communication channel for a node-NPG pair,
-encapsulating QoS parameters, assigned slots, and state for reordering and reliability.
-The \texttt{SkyNetConvergenceEntity} aggregates bearers for a single node,
-managing slot requests and coordinating resource allocation.
-This modular design ensures scalability, flexibility, and robustness,
-outperforming flat structures by providing flow isolation and dynamic adaptation.
+The 3-level hierarchy separates concerns into QoS, Bearer, and Entity layers, each addressing
+specific aspects of network management. The \texttt{SkyNetBearerQoS} structure defines QoS
+parameters such as priority (1--15, where 1 is highest), delay budget (in milliseconds), reliability
+(best-effort or reliable), and minimum TDMA slots, allowing precise service differentiation. The
+\texttt{SkyNetBearer} represents a logical communication channel for a node-NPG pair, encapsulating
+QoS parameters, assigned slots, and state for reordering and reliability. The
+\texttt{SkyNetConvergenceEntity} aggregates bearers for a single node, managing slot requests and
+coordinating resource allocation. This modular design ensures scalability, flexibility, and
+robustness, outperforming flat structures by providing flow isolation and dynamic adaptation.
 
 \subsection{Granular QoS Control}
-Tactical networks handle diverse traffic types, such as C2, position location
-information (PLI), and chat, each with distinct latency, reliability,
-and bandwidth requirements. A uniform QoS approach fails to meet these needs.
-The \texttt{SkyNetBearerQoS} structure enables granular control by defining
-specific parameters for each bearer. For instance, \texttt{SKYNET\_NPG\_CONTROL}
-(NPG 1, QoS 3) is assigned three slots with a low delay budget to ensure timely
-C2 delivery, while \texttt{SKYNET\_NPG\_CHAT} (NPG 103, QoS 0) receives one slot
-for best-effort traffic. This differentiation, inspired by LTE QCI, guarantees
-that high-priority traffic meets stringent military requirements,
-such as sub-50ms latency for C2, while optimizing resource allocation for lower-priority flows.
+Tactical networks handle diverse traffic types, such as C2, position location information (PLI), and
+chat, each with distinct latency, reliability, and bandwidth requirements. A uniform QoS approach
+fails to meet these needs. The \texttt{SkyNetBearerQoS} structure enables granular control by
+defining specific parameters for each bearer. For instance, \texttt{SKYNET\_NPG\_CONTROL} (NPG 1,
+QoS 3) is assigned three slots with a low delay budget to ensure timely C2 delivery, while
+\texttt{SKYNET\_NPG\_CHAT} (NPG 103, QoS 0) receives one slot for best-effort traffic. This
+differentiation, inspired by LTE QCI, guarantees that high-priority traffic meets stringent military
+requirements, such as sub-50ms latency for C2, while optimizing resource allocation for
+lower-priority flows.
 
 \subsection{Per-Node and Per-Flow Resource Management}
-Each node in the network may support multiple concurrent flows (e.g., C2, PLI, control)
-with varying QoS needs. Without isolation, these flows compete for resources,
-risking contention and degraded performance. The \texttt{SkyNetBearer}
-structure provides flow-level isolation by associating each bearer with
-a specific node-NPG pair, tracking its assigned slots and QoS parameters.
-The \texttt{SkyNetConvergenceEntity} groups all bearers for a node,
-enabling centralized resource management and preventing one flow from starving others.
-This per-node and per-flow approach ensures efficient slot allocation,
-supports multiple simultaneous communications, and scales to accommodate dynamic network topologies.
+Each node in the network may support multiple concurrent flows (e.g., C2, PLI, control) with varying
+QoS needs. Without isolation, these flows compete for resources, risking contention and degraded
+performance. The \texttt{SkyNetBearer} structure provides flow-level isolation by associating each
+bearer with a specific node-NPG pair, tracking its assigned slots and QoS parameters. The
+\texttt{SkyNetConvergenceEntity} groups all bearers for a node, enabling centralized resource
+management and preventing one flow from starving others. This per-node and per-flow approach ensures
+efficient slot allocation, supports multiple simultaneous communications, and scales to accommodate
+dynamic network topologies.
 
 \subsection{Reliability and Reordering}
-TDMA networks may deliver packets out of order due to slot scheduling
-or retransmissions, particularly for reliable traffic (e.g., \texttt{reliability=1}).
-The \texttt{SkyNetBearer} includes a \texttt{reorder\_queue} and
-tracks \texttt{expected\_seq\_no} and \texttt{last\_delivered} to
-reorder packets and ensure reliable delivery. The \texttt{SkyNetConvergenceEntity}
-coordinates reorder checks across bearers using \texttt{last\_reorder\_time\_us},
-minimizing overhead. This mechanism is critical for applications requiring guaranteed
-delivery, such as C2 or control messages, and enhances robustness compared to
-flat structures, which lack per-flow reordering capabilities.
+TDMA networks may deliver packets out of order due to slot scheduling or retransmissions,
+particularly for reliable traffic (e.g., \texttt{reliability=1}). The \texttt{SkyNetBearer} includes
+a \texttt{reorder\_queue} and tracks \texttt{expected\_seq\_no} and \texttt{last\_delivered} to
+reorder packets and ensure reliable delivery. The \texttt{SkyNetConvergenceEntity} coordinates
+reorder checks across bearers using \texttt{last\_reorder\_time\_us}, minimizing overhead. This
+mechanism is critical for applications requiring guaranteed delivery, such as C2 or control
+messages, and enhances robustness compared to flat structures, which lack per-flow reordering
+capabilities.
 
 \subsection{Dynamic Slot Allocation}
-Tactical networks operate in dynamic environments where nodes join or leave,
-and traffic patterns shift. Static slot assignments are inefficient and inflexible.
-The \texttt{SkyNetConvergenceEntity} tracks \texttt{slot\_requests\_pending} and
-manages bearer slot assignments via \texttt{assigned\_slots} and \texttt{slot\_count}.
-The \texttt{SkyNetBearerQoS} parameter \texttt{min\_slots} ensures minimum resource
-guarantees, while the entity facilitates dynamic re-allocation through
-the \texttt{skynet\_convergence\_schedule\_slots} function.
-Weighted Fair Queuing, driven by bearer priorities, optimizes slot distribution,
-ensuring high-QoS traffic receives preferential treatment.
-This adaptability is a key advantage over static or centralized designs.
+Tactical networks operate in dynamic environments where nodes join or leave, and traffic patterns
+shift. Static slot assignments are inefficient and inflexible. The entity
+tracks \texttt{slot\_requests\_pending} and manages bearer slot assignments via
+\texttt{assigned\_slots} and \texttt{slot\_count}. The bearer parameter
+\texttt{min\_slots} ensures minimum resource guarantees, while the entity facilitates dynamic
+re-allocation through the \texttt{skynet\_convergence\_schedule\_slots} function. Weighted Fair
+Queuing, driven by bearer priorities, optimizes slot distribution, ensuring high-QoS traffic
+receives preferential treatment. This adaptability is a key advantage over static or centralized
+designs.
 
 \subsection{Scalability and Modularity}
-A flat QoS structure becomes unwieldy as the number of nodes and NPGs increases,
-complicating scheduling and state management. The 3-level hierarchy addresses this
-by separating concerns: QoS defines service requirements, bearers manage
-flow-specific state, and entities coordinate node-level convergence.
-This modular design scales to support large networks, simplifies debugging,
-and facilitates maintenance. The entity layer aggregates bearer state, reducing
-scheduling complexity from O($n$) for $n$ bearers to O($m$) for $m$ nodes.
-The hierarchy also supports future enhancements, such as preemption or adaptive QoS,
-without requiring a system overhaul.
+A flat QoS structure becomes unwieldy as the number of nodes and NPGs increases, complicating
+scheduling and state management. The 3-level hierarchy addresses this by separating concerns: QoS
+defines service requirements, bearers manage flow-specific state, and entities coordinate node-level
+convergence. This modular design scales to support large networks, simplifies debugging, and
+facilitates maintenance. The entity layer aggregates bearer state, reducing scheduling complexity
+from O($n$) for $n$ bearers to O($m$) for $m$ nodes. The hierarchy also supports future
+enhancements, such as preemption or adaptive QoS, without requiring a system overhaul.
 
 \subsection{LTE QCI Compatibility}
-The 3-level hierarchy draws inspiration from LTE's QCI framework,
-which uses bearers with QoS profiles to manage diverse traffic
-types (e.g., VoIP, video, best-effort) per User Equipment (UE).
-By adapting this model to TDMA, Skynet replaces LTE's EPS bearers with
-TDMA slot-based bearers, leveraging telecom best practices.
-The \texttt{SkyNetBearerQoS} parameters mirror QCI attributes,
-such as priority and delay budget, ensuring compatibility with established standards.
-This alignment reduces design risk, enhances interoperability with telecom systems,
-and provides a familiar framework for engineers, making it easier to develop and maintain the system.
+The 3-level hierarchy draws inspiration from LTE's QCI framework, which uses bearers with QoS
+profiles to manage diverse traffic types (e.g., VoIP, video, best-effort) per User Equipment (UE).
+By adapting this model to TDMA, Skynet replaces LTE's EPS bearers with TDMA slot-based bearers,
+leveraging telecom best practices. The bearer parameters mirror QCI attributes,
+such as priority and delay budget, ensuring compatibility with established standards. This alignment
+reduces design risk, enhances interoperability with telecom systems, and provides a familiar
+framework for engineers, making it easier to develop and maintain the system.
 
-In conclusion, the 3-level QoS, Bearer, Entity hierarchy is a robust and
-scalable solution for managing QoS in Skynet's TDMA-based tactical network.
-It addresses critical requirements for granular control, per-node resource
-management, reliable delivery, dynamic slot allocation, and scalability,
-while drawing on LTE QCI principles to ensure proven performance.
-Compared to alternatives like flat or centralized designs,
-this hierarchy offers superior flexibility and resilience,
-meeting military-grade standards with sub-50ms latency and
-reliable communication for mission-critical applications.
+In conclusion, the 3-level QoS, Bearer, Entity hierarchy is a robust and scalable solution for
+managing QoS in Skynet’s TDMA-based tactical network. It addresses critical requirements for
+granular control, per-node resource management, reliable delivery, dynamic slot allocation, and
+scalability, particularly for swarm drone coordination. Drawing on LTE QCI principles, it ensures
+military-grade performance with sub-50ms latency and reliable communication for mission-critical
+applications, outperforming alternatives like flat or centralized designs in dynamic, resilient
+scenarios.
 
 \section{Conclusion}
 Link32 and Skynet provide a robust framework for tactical communication, combining low-latency,
-security, and scalability. Future improvements could address slot scalability, automated key
-distribution, and enhanced deduplication to support larger networks.
+security, and scalability for military applications, including swarm drone coordination. Future
+improvements could address slot scalability beyond 256 nodes, automated key distribution to replace
+manual provisioning, retransmission mechanisms for dropped messages, and enhanced deduplication to
+support larger networks.
 
 \begin{thebibliography}{10}
-\bibitem{milstd6016} U.S. Department of Defense, ``MIL-STD-6016: Tactical Data Link (TDL) J Message Standard,'' 2008.
-\bibitem{ada404334} U.S. Department of Defense, ``Link 16 Network Management and Operations,'' ADA404334, 2003.
+\bibitem{milstd6016} U.S. Department of Defense, ``MIL-STD-6016: Tactical Data Link (TDL) J
+                      Message Standard,'' 2008.
+\bibitem{ada404334} U.S. Department of Defense, ``Link 16 Network Management and Operations,''
+                     ADA404334, 2003.
+\bibitem{3gpp23203} 3GPP, ``TS 23.203: Policy and Charging Control Architecture (Release 15),''
+                    2018.
+\bibitem{mqtt5} OASIS, ``MQTT Version 5.0,'' OASIS Standard, 2019.
+\bibitem{tdma_tactical} J. Li and Y. Zhang, ``TDMA-Based Scheduling for Tactical Wireless
+                        Networks,'' IEEE Transactions on Vehicular Technology, vol. 68, no. 5,
+                        pp. 4987--4999, 2019.
+\bibitem{swarm_drones} A. Sharma and P. Kumar, ``Communication Protocols for UAV Swarm
+                       Coordination: A Survey,'' Journal of Network and Computer Applications,
+                       vol. 172, 2020.
 \end{thebibliography}
 
 \end{document}
