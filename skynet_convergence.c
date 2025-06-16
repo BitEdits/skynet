@@ -193,22 +193,34 @@ void skynet_convergence_schedule_slots(SkyNetConvergenceEntity *entity, uint32_t
 */
 
 void skynet_convergence_schedule_slots(QoSSlotAssignment *qos_slots, uint32_t *slots, uint32_t qos_slot_count, uint32_t slot_count) {
+    // Reset slot assignments
+    for (uint32_t i = 0; i < qos_slot_count; i++) {
+        uint32_t target_slots = qos_slots[i].slot_count;
+        qos_slots[i].slot_count = 0;
+        memset(qos_slots[i].slot_ids, 0, sizeof(qos_slots[i].slot_ids));
+        qos_slots[i].slot_count = target_slots;
+    }
+
+    // Calculate total weight
     uint32_t total_weight = 0;
     for (uint32_t i = 0; i < qos_slot_count; i++) {
-        total_weight += (16 - qos_slots[i].priority);
+        total_weight += (16 - qos_slots[i].priority) * qos_slots[i].slot_count;
     }
     if (total_weight == 0) return;
 
+    // Assign slots
     uint32_t slot_idx = 0;
     for (uint32_t i = 0; i < qos_slot_count && slot_idx < slot_count; i++) {
         QoSSlotAssignment *qos = &qos_slots[i];
-        uint32_t weight = (16 - qos->priority);
-        uint32_t slots_to_assign = (weight * qos->slot_count) / total_weight;
+        uint32_t weight = (16 - qos->priority) * qos->slot_count;
+        uint32_t slots_to_assign = (weight * slot_count) / total_weight;
+        // Strictly cap at target slot_count and MAX_QOS_SLOTS
+        slots_to_assign = slots_to_assign > qos->slot_count ? qos->slot_count : slots_to_assign;
+        slots_to_assign = slots_to_assign > MAX_QOS_SLOTS ? MAX_QOS_SLOTS : slots_to_assign;
 
+        qos->slot_count = 0;
         for (uint32_t j = 0; j < slots_to_assign && slot_idx < slot_count; j++) {
-            if (qos->slot_count < MAX_QOS_SLOTS) {
-                qos->slot_ids[qos->slot_count++] = slots[slot_idx++];
-            }
+            qos->slot_ids[qos->slot_count++] = slots[slot_idx++];
         }
     }
 }

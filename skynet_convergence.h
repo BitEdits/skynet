@@ -21,14 +21,6 @@ typedef struct {
     uint32_t min_slots;      // Minimum TDMA slots
 } SkyNetBearerQoS;
 
-typedef struct {
-    uint32_t npg_id;
-    uint8_t qos;
-    uint32_t slot_count;
-    uint32_t slot_ids[MAX_QOS_SLOTS];
-    uint8_t priority;
-} QoSSlotAssignment;
-
 // Bearer state
 typedef struct {
     uint32_t bearer_id;      // Unique bearer ID (0 to SKYNET_MAX_BEARERS-1)
@@ -49,6 +41,15 @@ typedef struct {
     uint32_t bearer_count;   // Number of active bearers
     atomic_uint slot_requests_pending; // Pending slot requests
 } SkyNetConvergenceEntity;
+
+// QoS-only reduced Bearer/Entity
+typedef struct {
+    uint32_t npg_id;
+    uint8_t qos;
+    uint32_t slot_count;
+    uint32_t slot_ids[MAX_QOS_SLOTS];
+    uint8_t priority;
+} QoSSlotAssignment;
 
 void skynet_convergence_init(SkyNetConvergenceEntity *entity, uint32_t node_id); // Initialize convergence entity
 int skynet_convergence_process(SkyNetConvergenceEntity *entity, SkyNetMessage *msg, struct sockaddr_in *addr, uint64_t recv_time); // Process incoming message (reordering, deduplication)
