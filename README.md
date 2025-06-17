@@ -29,7 +29,7 @@ in pure C99 with a single OpenSSL dependency (to be replaced in real applcations
 * Key Provisioning: public keys require controleable (manual) distribution.
 * Mandatory Encryption: All messages are encrypted with AES-256-GCM.
 * Node Identification: Node names are hashed to 32-bit using FNV-1a for compact addressing.
-* Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap (CMPXCHG) for concurrency.
+* Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap for concurrency.
 * Topic Architecture: Topics map to IP multicast groups, enabling scalable publish-subscribe communication.
 * Queue Management: Global network queue for incoming messages with per-topic subscriber queues.
 * Key Storage: Separate key stores per executable.
