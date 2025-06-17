@@ -313,7 +313,7 @@ void process_message(ServerState *state, SkyNetMessage *msg, struct sockaddr_in 
     }
 
     if (is_duplicate(state, msg->node_id, msg->seq_no)) {
-        fprintf(stderr, "Duplicate message: node_id=%u, seq_no=%u\n", msg->node_id, msg->seq_no);
+        fprintf(stderr, "Duplicate message: node_id=%x, seq_no=%u\n", msg->node_id, msg->seq_no);
         return;
     }
 
