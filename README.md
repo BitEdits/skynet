@@ -80,9 +80,9 @@ typedef struct {
 | 7   | npg_surveillance | 239.255.0.7   | Forwards status messages with sensor data to subscribers.          |
 | 29  | npg_chat         | 239.255.0.29  | Relays chat and ack messages for tactical communication.           |
 | 100 | npg_c2           | 239.255.0.100 | Processes waypoint and formation messages for C2.                  |
-| 101 | npg_alerts       | 239.255.0.101 | Broadcasts status messages for network alerts and self-healing.    |
+| 101 | npg_alerts       | 239.255.0.101 | Status messages for network alerts and self-healing.               |
 | 102 | npg_logistics    | 239.255.0.102 | Handles status and chat for logistical coordination.               |
-| 103 | npg_coord        | 239.255.0.103 | Relays chat, waypoint, and formation for inter-agent coordination. |
+| 103 | npg_coord        | 239.255.0.103 | Relays chat, waypoint, and swarm coordination.                     |
 
 ### Slot Management
 
