@@ -252,7 +252,7 @@ The client sends key exchange, slot request, and status messages.
 ### Limitations
 
 * Slot Scalability: Fixed `SLOT_COUNT=256` limits dynamic topics to 256 nodes.
-* No Retransmission: Messages dropped due to network errors are not retransmitted (aligned with QoS settings).
+* No Retransmission: Messages dropped due to network errors are not retransmitted.
 * Key Management: Manual public key copying required; no automated key distribution.
 * Deduplication: `SEQ_CACHE_SIZE=1024` may lead to cache collisions in high-traffic scenarios.
 
