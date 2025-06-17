@@ -1,11 +1,13 @@
-// gcc -o skynet skynet.c skynet_proto.c skynet_conv.c -lcrypto
+// gcc -o skynet skynet.c skynet_proto.c skynet_conv.c -pthread -lcrypto
 // skynet server
 
 #define _POSIX_C_SOURCE 200809L
 
 #ifdef __APPLE__
 #define _DARWIN_C_SOURCE
-#define __APPLE_USE_RFC_2292  // enable advanced socket/multicast APIs
+#else
+#define _GNU_SOURCE
+#include <sched.h> // For CPU_ZERO, CPU_SET, etc. on Linux
 #endif
 
 #include <stdio.h>
@@ -40,8 +42,13 @@
 typedef struct {
     uint32_t current_slot;
     int socket_fd;
+#ifdef __APPLE__
     int kqueue_fd;
-    int timer_id; // Changed from timer_fd to timer_id for kqueue timer
+    int timer_id; // For kqueue timer
+#else
+    int epoll_fd;
+    int timer_fd; // For timerfd
+#endif
     MessageQueue mq;
     MessageQueue topic_queues[MAX_TOPICS];
     pthread_t workers[THREAD_COUNT];
@@ -67,7 +74,11 @@ typedef struct {
 typedef struct {
     ServerState *state;
     int worker_id;
+#ifdef __APPLE__
     int kqueue_fd;
+#else
+    int epoll_fd;
+#endif
 } WorkerState;
 
 static uint8_t npg_ids[MAX_TOPICS] = {
@@ -294,7 +305,10 @@ void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_tim
     } else {
         snprintf(mcast_ip, sizeof(mcast_ip), "239.255.0.%d", msg->npg_id & 0xFF);
     }
-    inet_pton(AF_INET, mcast_ip, &mcast_addr.sin_addr);
+    if (inet_pton(AF_INET, mcast_ip, &mcast_addr.sin_addr) <= 0) {
+        fprintf(stderr, "Invalid multicast address %s\n", mcast_ip);
+        return;
+    }
     if (sendto(state->socket_fd, buffer, len, 0, (struct sockaddr *)&mcast_addr, sizeof(mcast_addr)) < 0) {
         if (errno != EAGAIN && errno != EWOULDBLOCK) {
             perror("sendto failed");
@@ -580,10 +594,14 @@ int main(int argc, char *argv[]) {
     }
 
     struct ip_mreq mreq;
+    memset(&mreq, 0, sizeof(mreq)); // Initialize to avoid undefined behavior
     for (int i = 0; i < MAX_TOPICS; i++) {
         char mcast_ip[16];
         snprintf(mcast_ip, sizeof(mcast_ip), "239.255.0.%d", npg_ids[i]);
-        inet_pton(AF_INET, mcast_ip, &mreq.imr_multiaddr);
+        if (inet_pton(AF_INET, mcast_ip, &mreq.imr_multiaddr) <= 0) {
+            fprintf(stderr, "Invalid multicast address %s\n", mcast_ip);
+            continue;
+        }
         mreq.imr_interface.s_addr = INADDR_ANY;
         if (setsockopt(state->socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
             fprintf(stderr, "Failed to join multicast group %s: %s\n", mcast_ip, strerror(errno));
@@ -660,14 +678,24 @@ int main(int argc, char *argv[]) {
 #else
         ws->epoll_fd = epoll_create1(0);
 #endif
-        if (ws->kqueue_fd < 0) {
+        if (
+#ifdef __APPLE__
+            ws->kqueue_fd < 0
+#else
+            ws->epoll_fd < 0
+#endif
+        ) {
             perror("kqueue/epoll_create1 worker failed");
             free(ws);
             continue;
         }
         if (pthread_create(&state->workers[i], NULL, worker_thread, ws) != 0) {
             perror("pthread_create failed");
+#ifdef __APPLE__
             close(ws->kqueue_fd);
+#else
+            close(ws->epoll_fd);
+#endif
             free(ws);
             continue;
         }
