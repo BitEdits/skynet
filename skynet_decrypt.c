@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
        return 1;
     }
 
-    hex_dump("decrypt", (char *)&msg, 200);
+    hex_dump("decrypt", (const uint8_t *)&msg, 200);
 
     char out_path[256];
     snprintf(out_path, sizeof(out_path), "%s.dec", encrypted_file_name);

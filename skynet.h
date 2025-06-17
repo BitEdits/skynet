@@ -127,6 +127,9 @@ typedef struct {
     atomic_uint head;
     atomic_uint tail;
     int event_fds[THREAD_COUNT];
+#ifdef __APPLE__
+    int event_fds_write[THREAD_COUNT]; // Write end of pipes for macOS
+#endif
 } MessageQueue;
 
 struct ServerState; // Forward declaration

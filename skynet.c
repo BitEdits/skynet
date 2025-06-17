@@ -1,37 +1,47 @@
-// gcc -o skynet skynet.c skynet_proto.c -lcrypto
+// gcc -o skynet skynet.c skynet_proto.c skynet_conv.c -lcrypto
 // skynet server
 
-#define _GNU_SOURCE
 #define _POSIX_C_SOURCE 200809L
+
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#define __APPLE_USE_RFC_2292  // enable advanced socket/multicast APIs
+#endif
+
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/epoll.h>
 #include <sys/socket.h>
-#include <sys/timerfd.h>
-#include <sys/eventfd.h>
 #include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
-#include <sched.h>
 #include <stdatomic.h>
 #include <net/if.h>
-#include <openssl/rand.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/err.h>
+#ifdef __APPLE__
+#include <sys/event.h>
+#include <sys/time.h>
+#else
+#include <sys/epoll.h>
+#include <sys/timerfd.h>
+#include <sys/eventfd.h>
+#endif
 #include "skynet.h"
 #include "skynet_conv.h"
 
 typedef struct {
     uint32_t current_slot;
     int socket_fd;
-    int epoll_fd;
-    int timer_fd;
+    int kqueue_fd;
+    int timer_id; // Changed from timer_fd to timer_id for kqueue timer
     MessageQueue mq;
     MessageQueue topic_queues[MAX_TOPICS];
     pthread_t workers[THREAD_COUNT];
@@ -57,7 +67,7 @@ typedef struct {
 typedef struct {
     ServerState *state;
     int worker_id;
-    int epoll_fd;
+    int kqueue_fd;
 } WorkerState;
 
 static uint8_t npg_ids[MAX_TOPICS] = {
@@ -74,11 +84,26 @@ void queue_init(MessageQueue *q) {
     atomic_store(&q->head, 0);
     atomic_store(&q->tail, 0);
     for (int i = 0; i < THREAD_COUNT; i++) {
+#ifdef __APPLE__
+        int pipefd[2];
+        if (pipe(pipefd) < 0) {
+            perror("pipe creation failed");
+            exit(1);
+        }
+        q->event_fds[i] = pipefd[0];
+        q->event_fds_write[i] = pipefd[1];
+        if (fcntl(q->event_fds[i], F_SETFL, O_NONBLOCK) < 0 ||
+            fcntl(q->event_fds_write[i], F_SETFL, O_NONBLOCK) < 0) {
+            perror("fcntl non-blocking failed");
+            exit(1);
+        }
+#else
         q->event_fds[i] = eventfd(0, EFD_NONBLOCK);
         if (q->event_fds[i] < 0) {
             perror("eventfd creation failed");
             exit(1);
         }
+#endif
     }
 }
 
@@ -97,11 +122,19 @@ int queue_enqueue(MessageQueue *q, const SkyNetMessage *msg, const struct sockad
     q->recv_times[head] = recv_time;
     uint64_t signal = 1;
     for (int i = 0; i < THREAD_COUNT; i++) {
+#ifdef __APPLE__
+        if (q->event_fds_write[i] >= 0) {
+            if (write(q->event_fds_write[i], &signal, sizeof(signal)) < 0) {
+                perror("pipe write failed");
+            }
+        }
+#else
         if (q->event_fds[i] >= 0) {
             if (write(q->event_fds[i], &signal, sizeof(signal)) < 0) {
                 perror("eventfd write failed");
             }
         }
+#endif
     }
     return 0;
 }
@@ -122,12 +155,16 @@ int queue_dequeue(MessageQueue *q, SkyNetMessage *msg, struct sockaddr_in *addr,
 }
 
 void pin_thread(int core_id) {
+#ifdef __linux__
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
     CPU_SET(core_id % sysconf(_SC_NPROCESSORS_ONLN), &cpuset);
     if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) < 0) {
         perror("pthread_setaffinity_np failed");
     }
+#else
+    (void)core_id;
+#endif
 }
 
 void server_init(ServerState *state, char *node_name) {
@@ -226,7 +263,6 @@ void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_tim
     for (uint32_t i = 0; i < state->qos_slot_count; i++) {
         if (state->qos_slots[i].npg_id == msg->npg_id) {
             if (state->qos_slots[i].slot_count > 0) {
-                // Cycle through slots based on current_slot
                 slot_id = state->qos_slots[i].slot_ids[state->current_slot % state->qos_slots[i].slot_count];
             }
             topic_idx = i;
@@ -264,8 +300,8 @@ void send_to_npg(ServerState *state, const SkyNetMessage *msg, uint64_t recv_tim
             perror("sendto failed");
         }
     } else {
-        printf("%sMessage sent from=%x, to=%x, seq=%u, multicast=%s, latency=%lu.%s\n", YELLOW,
-               msg->node_id, msg->npg_id, msg->seq_no, mcast_ip, send_time - recv_time, RESET);
+        printf("%sMessage sent from=%x, to=%x, seq=%u, multicast=%s, latency=%llu.%s\n", YELLOW,
+               msg->node_id, msg->npg_id, msg->seq_no, mcast_ip, (unsigned long long)(send_time - recv_time), RESET);
     }
 }
 
@@ -399,12 +435,63 @@ void *worker_thread(void *arg) {
     int worker_id = ws->worker_id;
     printf("%sWorker thread %d started.%s\n", CYAN, ws->worker_id, RESET);
 
+#ifdef __APPLE__
+    int kq = kqueue();
+    if (kq < 0) {
+        perror("kqueue failed");
+        free(ws);
+        return NULL;
+    }
+    ws->kqueue_fd = kq;
+
+    struct kevent ev;
+    EV_SET(&ev, state->mq.event_fds[worker_id], EVFILT_READ, EV_ADD, 0, 0, NULL);
+    if (kevent(kq, &ev, 1, NULL, 0, NULL) < 0) {
+        perror("kevent add failed");
+        close(kq);
+        free(ws);
+        return NULL;
+    }
+
+    struct kevent events[32];
+    while (atomic_load(&state->running)) {
+        int nfds = kevent(kq, NULL, 0, events, 32, NULL);
+        if (nfds < 0) {
+            if (errno != EINTR) perror("kevent wait failed");
+            continue;
+        }
+        for (int i = 0; i < nfds; i++) {
+            if (events[i].filter == EVFILT_READ && events[i].ident == (uintptr_t)state->mq.event_fds[worker_id]) {
+                uint64_t count;
+                if (read(state->mq.event_fds[worker_id], &count, sizeof(count)) < 0) {
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        perror("pipe read failed");
+                    }
+                    continue;
+                }
+                SkyNetMessage msg;
+                struct sockaddr_in addr;
+                uint64_t recv_time;
+                while (queue_dequeue(&state->mq, &msg, &addr, &recv_time) == 0) {
+                    process_message(state, &msg, &addr, recv_time);
+                }
+                for (int j = 0; j < MAX_TOPICS; j++) {
+                    while (queue_dequeue(&state->topic_queues[j], &msg, &addr, &recv_time) == 0) {
+                        send_to_npg(state, &msg, recv_time);
+                    }
+                }
+            }
+        }
+    }
+    close(kq);
+#else
     int epoll_fd = epoll_create1(0);
     if (epoll_fd < 0) {
         perror("epoll_create1 failed");
         free(ws);
         return NULL;
     }
+    ws->epoll_fd = epoll_fd;
 
     struct epoll_event ev = { .events = EPOLLIN, .data.fd = state->mq.event_fds[worker_id] };
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, state->mq.event_fds[worker_id], &ev) < 0) {
@@ -442,9 +529,12 @@ void *worker_thread(void *arg) {
             }
         }
     }
-
     close(epoll_fd);
+#endif
     close(state->mq.event_fds[worker_id]);
+#ifdef __APPLE__
+    close(state->mq.event_fds_write[worker_id]);
+#endif
     free(ws);
     return NULL;
 }
@@ -502,6 +592,22 @@ int main(int argc, char *argv[]) {
         }
     }
 
+#ifdef __APPLE__
+    state->kqueue_fd = kqueue();
+    if (state->kqueue_fd < 0) {
+        perror("kqueue failed");
+        goto cleanup;
+    }
+
+    struct kevent ev[2];
+    EV_SET(&ev[0], state->socket_fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    state->timer_id = 1; // Unique identifier for timer
+    EV_SET(&ev[1], state->timer_id, EVFILT_TIMER, EV_ADD, 0, TIME_SLOT_INTERVAL_US / 1000, NULL); // Timer in milliseconds
+    if (kevent(state->kqueue_fd, ev, 2, NULL, 0, NULL) < 0) {
+        perror("kevent add failed");
+        goto cleanup;
+    }
+#else
     state->epoll_fd = epoll_create1(0);
     if (state->epoll_fd < 0) {
         perror("epoll_create1 failed");
@@ -535,6 +641,7 @@ int main(int argc, char *argv[]) {
         perror("epoll_ctl timerfd failed");
         goto cleanup;
     }
+#endif
 
     char addr_str[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &state->server_addr.sin_addr, addr_str, INET_ADDRSTRLEN);
@@ -548,22 +655,66 @@ int main(int argc, char *argv[]) {
         }
         ws->state = state;
         ws->worker_id = i;
+#ifdef __APPLE__
+        ws->kqueue_fd = kqueue();
+#else
         ws->epoll_fd = epoll_create1(0);
-        if (ws->epoll_fd < 0) {
-            perror("epoll_create1 worker failed");
+#endif
+        if (ws->kqueue_fd < 0) {
+            perror("kqueue/epoll_create1 worker failed");
             free(ws);
             continue;
         }
         if (pthread_create(&state->workers[i], NULL, worker_thread, ws) != 0) {
             perror("pthread_create failed");
-            close(ws->epoll_fd);
+            close(ws->kqueue_fd);
             free(ws);
             continue;
         }
     }
 
+#ifdef __APPLE__
+    struct kevent events[32];
+#else
     struct epoll_event events[32];
+#endif
     while (atomic_load(&state->running)) {
+#ifdef __APPLE__
+        int nfds = kevent(state->kqueue_fd, NULL, 0, events, 32, NULL);
+        if (nfds < 0) {
+            if (errno != EINTR) perror("kevent wait failed");
+            continue;
+        }
+        for (int i = 0; i < nfds; i++) {
+            if (events[i].filter == EVFILT_READ && events[i].ident == (uintptr_t)state->socket_fd) {
+                uint8_t buffer[MAX_BUFFER];
+                struct sockaddr_in addr;
+                socklen_t addr_len = sizeof(addr);
+                ssize_t len = recvfrom(state->socket_fd, buffer, MAX_BUFFER, 0, (struct sockaddr *)&addr, &addr_len);
+                if (len < 0) {
+                    if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                        perror("recvfrom failed");
+                    }
+                    continue;
+                }
+                SkyNetMessage msg;
+                if (skynet_deserialize(&msg, buffer, len) != 0) {
+                    char addr_str[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &addr.sin_addr, addr_str, INET_ADDRSTRLEN);
+                    fprintf(stderr, "Failed to deserialize message from %s:%d\n", addr_str, ntohs(addr.sin_port));
+                    continue;
+                }
+                uint64_t recv_time = get_time_us();
+                if (queue_enqueue(&state->mq, &msg, &addr, recv_time) != 0) {
+                    char addr_str[INET_ADDRSTRLEN];
+                    inet_ntop(AF_INET, &addr.sin_addr, addr_str, INET_ADDRSTRLEN);
+                    fprintf(stderr, "Failed to enqueue message from %s:%d\n", addr_str, ntohs(addr.sin_port));
+                }
+            } else if (events[i].filter == EVFILT_TIMER && events[i].ident == state->timer_id) {
+                state->current_slot = (state->current_slot + 1) % SLOT_COUNT;
+            }
+        }
+#else
         int nfds = epoll_wait(state->epoll_fd, events, 32, -1);
         if (nfds < 0) {
             if (errno != EINTR) perror("epoll_wait main failed");
@@ -605,6 +756,7 @@ int main(int argc, char *argv[]) {
                 state->current_slot = (state->current_slot + 1) % SLOT_COUNT;
             }
         }
+#endif
     }
 
 cleanup:
@@ -614,8 +766,12 @@ cleanup:
             pthread_join(state->workers[i], NULL);
         }
     }
+#ifdef __APPLE__
+    if (state->kqueue_fd >= 0) close(state->kqueue_fd);
+#else
     if (state->timer_fd >= 0) close(state->timer_fd);
     if (state->epoll_fd >= 0) close(state->epoll_fd);
+#endif
     if (state->socket_fd >= 0) close(state->socket_fd);
     if (state->ec_key) EVP_PKEY_free(state->ec_key);
     for (int i = 0; i < MAX_TOPICS; i++) {
@@ -623,10 +779,16 @@ cleanup:
     }
     for (size_t i = 0; i < THREAD_COUNT; i++) {
         if (state->mq.event_fds[i] >= 0) close(state->mq.event_fds[i]);
+#ifdef __APPLE__
+        if (state->mq.event_fds_write[i] >= 0) close(state->mq.event_fds_write[i]);
+#endif
     }
     for (size_t i = 0; i < MAX_TOPICS; i++) {
         for (size_t j = 0; j < THREAD_COUNT; j++) {
             if (state->topic_queues[i].event_fds[j] >= 0) close(state->topic_queues[i].event_fds[j]);
+#ifdef __APPLE__
+            if (state->topic_queues[i].event_fds_write[j] >= 0) close(state->topic_queues[i].event_fds_write[j]);
+#endif
         }
     }
     free(state);

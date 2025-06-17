@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
        return 1;
     }
 
-    hex_dump("encrypt", (char *)&msg, 200);
+    hex_dump("encrypt", (const uint8_t *)&msg, 200);
 
     uint8_t buffer[MAX_BUFFER];
     fprintf(stderr, "Debug: Serializing message\n");

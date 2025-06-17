@@ -29,41 +29,43 @@ robust performance in mission-critical scenarios.
 
 \newpage
 \section{Introduction}
-Link32 is a tactical communication protocol inspired by standards such as Link16, VMF, TSM, SRW, and
-MQTT, tailored for military applications requiring robust, low-latency, and secure data exchange in
-contested environments. It facilitates swarm drone coordination, real-time position location
-information (PLI), command and control (C2), and tactical chat using UDP-based multicast networks.
+Link32 is a tactical communication protocol inspired by standards such as VMF, TSM, SRW, and
+MQTT \cite{mqtt5}, LTE (HSS, PDCP, MME, QCI), and TDL \cite{tdl}, tailored for military
+applications requiring robust, low-latency, and secure data exchange in contested environments.
+It facilitates swarm drone coordination, real-time position location information (PLI),
+command and control (C2), and tactical chat using UDP-based multicast networks.
+
 Skynet is the reference server implementation of Link32, developed in C99 with minimal dependencies
 to ensure portability and performance on resource-constrained devices. Its convergence layer draws
-inspiration from LTE’s QoS Class Identifier (QCI) framework, enabling granular QoS control and
+inspiration from LTE’s QoS Class Identifier QCI framework \cite{3gpp}, enabling granular QoS control and
 dynamic resource allocation for mission-critical communications.
 
-\subsection{Properties}
-Link32 and Skynet are designed with the following properties:
-\begin{itemize}
-    \item \textbf{Implementation}: Written in C99 for portability and performance.
-    \item \textbf{Message Size}: Minimum 32-byte header (48 bytes with AES-256-GCM tag) to optimize bandwidth.
-    \item \textbf{Security}: ECDH key exchange over secp384r1, AES-256-GCM encryption for all messages.
-    \item \textbf{Latency}: Microsecond-precision timing using monotonic clocks and non-blocking I/O.
-    \item \textbf{Concurrency}: Lock-free atomic operations (CMPXCHG) for thread-safe queue management.
-    \item \textbf{Networking}: UDP multicast with topic-based subscriptions.
-    \item \textbf{Swarm Scalability}: Supports large-scale drone swarms via dynamic slot allocation.
-    \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
-    \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
-    \item \textbf{Threat Model}: Confidentiality and integrity, no non-repudiation.
-\end{itemize}
-
-\newpage
 \subsection{Principles}
 Link32 adheres to the following design principles:
 \begin{itemize}
-    \item \textbf{Key Provisioning}: Manual public key distribution for controlled setup.
+    \item \textbf{Threat Model}: Confidentiality and integrity, no non-repudiation.
+    \item \textbf{Latency}: Microsecond-precision timings .
+    \item \textbf{Implementation}: Written in C99 for portability and performance.
+    \item \textbf{Key Provisioning}: Key distribution for controlled setup.
     \item \textbf{Mandatory Encryption}: All messages encrypted with AES-256-GCM.
     \item \textbf{Node Identification}: Node names hashed to 32-bit using FNV-1a.
     \item \textbf{Lock-Free Design}: Uses atomic compare-and-swap for concurrency.
     \item \textbf{Topic Architecture}: Topics map to IP multicast groups.
     \item \textbf{Queue Management}: Global network queue, per-topic subscribes.
     \item \textbf{Key Storage}: Separate key stores per executable.
+\end{itemize}
+
+\newpage
+
+\subsection{Properties}
+Link32 and Skynet are designed with the following properties:
+\begin{itemize}
+    \item \textbf{Message Size}: 32-byte header (48 bytes payload with GCM tag).
+    \item \textbf{Security}: ECDH key exchange SECP384R1, Mandatory AES-256-GCM.
+    \item \textbf{Non-blocking}: Using monotonic clocks and non-blocking I/O.
+    \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
+    \item \textbf{Swarm Scalability}: Supports large-scale drone swarms.
+    \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
 \end{itemize}
 
 \section{Link32 Protocol}
@@ -87,8 +89,8 @@ typedef struct {
 \end{lstlisting}
 \begin{itemize}
     \item \textbf{Header Size}: 32 bytes.
-    \item \textbf{Total Size}: 48 bytes minimum (32-byte header + 16-byte GCM tag).
-    \item \textbf{Payload}: Up to 32720 bytes.
+    \item \textbf{Minimum Payload Size}: 48 bytes minimum (32-byte + GCM tag).
+    \item \textbf{Maximum Payload Size}: Up to 32720 bytes.
 \end{itemize}
 
 \newpage
@@ -100,7 +102,7 @@ The protocol defines seven message types, as shown in Table 1.
 \caption{Link32 Message Types}
 \begin{tabular}{clp{8cm}}
 \hline
-\textbf{ID} & \textbf{Type} & \textbf{Description} \\
+\textbf{Type} & \textbf{Name} & \textbf{Description} \\
 \hline
 0 & Key Exchange & Exchanges ECC public keys for ECDH session setup. \\
 1 & Slot Request & Requests a TDMA slot from the server. \\
@@ -199,10 +201,10 @@ Controller & 1, 6, 100, 101         & C2, PLI, alerts for command posts. \\
 \subsection{Build}
 To build Skynet:
 \begin{lstlisting}[language=bash]
-$ git clone git@github.com:BitEdits/skynet
-$ cd skynet
-$ gcc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
-$ gcc -o skynet skynet.c skynet_proto.c skynet_conv.c -lcrypto
+# git clone git@github.com:BitEdits/skynet
+# cd skynet
+# cc -o skynet_client skynet_client.c skynet_proto.c -lcrypto
+# cc -o skynet skynet.c skynet_proto.c skynet_conv.c -lcrypto -pthread
 \end{lstlisting}
 
 \newpage
@@ -462,14 +464,14 @@ handshake with strict ordering and deduplication via \texttt{seq\_no}. All Netwo
 \hline
 \textbf{QoS} & \textbf{Priority} & \textbf{NPG} & \textbf{QCI} & \textbf{Budget} & \textbf{Slots} & \textbf{Type} \\
 \hline
-0 & 15 & 29  & QCI 9 & 300ms & 1 & \texttt{CHAT} \\
-0 & 14 & 102 & QCI 9 & 300ms & 1 & \texttt{CHAT, STATUS} \\
-0 & 13 & 103 & QCI 9 & 300ms & 1 & \texttt{CHAT, WAYPOINT} \\
-1 & 7  & 6   & QCI 7 & 100ms & 2 & \texttt{STATUS} \\
-1 & 6  & 7   & QCI 7 & 100ms & 2 & \texttt{STATUS} \\
-2 & 3  & 1   & QCI 5 & 50ms  & 3 & \texttt{EXCHANGE, ACK} \\
-2 & 2  & 100 & QCI 3 & 50ms  & 3 & \texttt{FORMATION, ACK} \\
-2 & 1  & 101 & QCI 5 & 50ms  & 3 & \texttt{ACK, STATUS} \\
+0 & 15 & 29  & QCI 9 & 300ms & 1 & 2 \\
+0 & 14 & 102 & QCI 9 & 300ms & 1 & 2, 5 \\
+0 & 13 & 103 & QCI 9 & 300ms & 1 & 2, 4 \\
+1 & 7  & 6   & QCI 7 & 100ms & 2 & 5 \\
+1 & 6  & 7   & QCI 7 & 100ms & 2 & 5 \\
+2 & 3  & 1   & QCI 5 & 50ms  & 3 & 0, 1, 3 \\
+2 & 2  & 100 & QCI 3 & 50ms  & 3 & 3, 4, 6 \\
+2 & 1  & 101 & QCI 5 & 50ms  & 3 & 3, 6 \\
 \hline
 \end{tabular}
 \end{table}
@@ -493,13 +495,14 @@ manual provisioning, retransmission mechanisms for dropped messages, and enhance
 support larger networks.
 
 \begin{thebibliography}{10}
-\bibitem{milstd6016} U.S. Department of Defense, ``MIL-STD-6016: Tactical Data Link (TDL) J-Message Standard,'' 2008.
-\bibitem{ada404334} U.S. Department of Defense, ``Link 16 Network Management and Operations,'' ADA404334, 2003.
-\bibitem{3gpp23203} 3GPP, ``TS 23.203: Policy and Charging Control Architecture (Release 15),'' 2018.
+\bibitem{tdl} U.S. Department of Defense, ``MIL-STD-6016: Tactical Data Link (TDL) J-Message Standard,'' 2008.
+\bibitem{link16} U.S. Department of Defense, ``Link 16 Network Management and Operations,'' ADA404334, 2003.
+\bibitem{3gpp} 3GPP, ``TS 23.203: Policy and Charging Control Architecture (Release 15),'' 2018.
 \bibitem{mqtt5} ISO/IETF standard ``MQTT Version 5.0,'', 2019.
 \bibitem{link16} Maksym Sokhatsky. A Non-Blocking C Implementation of a Link16 Service-Oriented Architecture: Design and Verification. 2025.
-\bibitem{tdma_tactical} J. Li and Y. Zhang, ``TDMA-Based Scheduling for Tactical Wireless Networks,'' IEEE Transactions on Vehicular Technology, vol. 68, no. 5, pp. 4987--4999, 2019.
-\bibitem{swarm_drones} A. Sharma and P. Kumar, ``Communication Protocols for UAV Swarm Coordination: A Survey,'' Journal of Network and Computer Applications, vol. 172, 2020.
+\bibitem{gsm} Maksym Sokhatsky. A Non-Blocking C Implementation of a GSM HSS and PDCP Services. 2025.
+\bibitem{tdma} J. Li and Y. Zhang, ``TDMA-Based Scheduling for Tactical Wireless Networks,'' IEEE Transactions on Vehicular Technology, vol. 68, no. 5, pp. 4987--4999, 2019.
+\bibitem{drone_swarm} A. Sharma and P. Kumar, ``Communication Protocols for UAV Swarm Coordination: A Survey,'' Journal of Network and Computer Applications, vol. 172, 2020.
 \end{thebibliography}
 
 \end{document}
