@@ -1,6 +1,6 @@
 # Skynet/Link32
 
-Link32 is a tactical communication protocol inspired by VMF, TSM, SRW format with MQTT and LTE 4G (MSS, PDCP, QCI) protocol stacks
+Link32 is a tactical communication protocol inspired by VMF, TSM, SRW formats with MQTT and LTE 4G (MSS, PDCP, QCI) protocol stacks
 designed for military applications requiring low-latency, secure, and scalable data
 exchange in contested environments. It supports swarm coordination, real-time position
 location information (PLI), command and control (C2), and tactical chat over UDP-based
