@@ -603,6 +603,10 @@ int main(int argc, char *argv[]) {
             continue;
         }
         mreq.imr_interface.s_addr = INADDR_ANY;
+        int loop=0;
+        if (setsockopt(state->socket_fd, IPPROTO_IP, IP_MULTICAST_IF, &loop, sizeof(loop)) < 0) {
+            fprintf(stderr, "Failed disabling multicast.\n");
+        }
         if (setsockopt(state->socket_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
             fprintf(stderr, "Failed to join multicast group %s: %s\n", mcast_ip, strerror(errno));
         } else {

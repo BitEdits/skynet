@@ -29,7 +29,7 @@ in pure C99 with a single OpenSSL dependency (to be replaced in real applcations
 * Key Provisioning: public keys require controleable (manual) distribution.
 * Mandatory Encryption: All messages are encrypted with AES-256-GCM.
 * Node Identification: Node names are hashed to 32-bit using FNV-1a for compact addressing.
-* Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap (CMPXCHG) for concurrency.
+* Lock-Free Design: No mutexes or semaphores; uses atomic compare-and-swap for concurrency.
 * Topic Architecture: Topics map to IP multicast groups, enabling scalable publish-subscribe communication.
 * Queue Management: Global network queue for incoming messages with per-topic subscriber queues.
 * Key Storage: Separate key stores per executable.
@@ -80,9 +80,9 @@ typedef struct {
 | 7   | npg_surveillance | 239.255.0.7   | Forwards status messages with sensor data to subscribers.          |
 | 29  | npg_chat         | 239.255.0.29  | Relays chat and ack messages for tactical communication.           |
 | 100 | npg_c2           | 239.255.0.100 | Processes waypoint and formation messages for C2.                  |
-| 101 | npg_alerts       | 239.255.0.101 | Broadcasts status messages for network alerts and self-healing.    |
+| 101 | npg_alerts       | 239.255.0.101 | Status messages for network alerts and self-healing.               |
 | 102 | npg_logistics    | 239.255.0.102 | Handles status and chat for logistical coordination.               |
-| 103 | npg_coord        | 239.255.0.103 | Relays chat, waypoint, and formation for inter-agent coordination. |
+| 103 | npg_coord        | 239.255.0.103 | Relays chat, waypoint, and swarm coordination.                     |
 
 ### Slot Management
 
@@ -252,7 +252,7 @@ The client sends key exchange, slot request, and status messages.
 ### Limitations
 
 * Slot Scalability: Fixed `SLOT_COUNT=256` limits dynamic topics to 256 nodes.
-* No Retransmission: Messages dropped due to network errors are not retransmitted (aligned with QoS settings).
+* No Retransmission: Messages dropped due to network errors are not retransmitted.
 * Key Management: Manual public key copying required; no automated key distribution.
 * Deduplication: `SEQ_CACHE_SIZE=1024` may lead to cache collisions in high-traffic scenarios.
 
