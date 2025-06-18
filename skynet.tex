@@ -47,11 +47,13 @@ robust performance in mission-critical scenarios.
 
 \newpage
 \section{Introduction}
-Link32 is a tactical communication protocol inspired by standards such as VMF, TSM, SRW, and
-MQTT \cite{mqtt5}, LTE (HSS, PDCP, MME, QCI), and TDL \cite{tdl} with \cite{link16std}, tailored for military
-applications requiring robust, low-latency, and secure data exchange in contested environments.
-It facilitates swarm drone coordination, real-time position location information (PLI),
-command and control (C2), and tactical chat using UDP-based multicast networks.
+Link32 is a tactical real-time communication protocol inspired by standards such as
+VMF, TSM, SRW, TDL \cite{tdl} (message formats) along with MQTT \cite{mqtt5},
+LTE (HSS, PDCP, MME, QCI), Link16 \cite{link16std} (telecommunication protocols),
+tailored for military applications requiring robust, low-latency, and secure data
+exchange in contested environments. It facilitates swarm drone coordination,
+real-time position location information (PLI), command and control (C2),
+and tactical chat using UDP-based multicast networks.
 
 Skynet is the reference server implementation of Link32, developed in C99 with minimal dependencies
 to ensure portability and performance on resource-constrained devices. Its convergence layer draws
