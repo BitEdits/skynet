@@ -455,7 +455,7 @@ skynet_keygen <node> [--server|--client]
 \end{lstlisting}
 
 \subsubsection*{Message Encryption}
-Encrypts a test message to \texttt{<npg\_id>.sky}.
+Encrypts a test message to \texttt{file.sky}.
 \begin{lstlisting}
 skynet_encrypt <sender> <recipient> <file>
 \end{lstlisting}
@@ -476,6 +476,12 @@ skynet <node>
 Runs the client with FNV-1a hashed \texttt{<node>}.
 \begin{lstlisting}
 skynet_client <node>
+\end{lstlisting}
+
+\subsubsection*{Skynet User Equipment Programming}
+Flash SIM cards for srsRAN setups with \texttt{PCSC} and \texttt{CCID} supported valued in \texttt{<device>} placeholder.
+\begin{lstlisting}
+skynet_sim <device> <sim.imsi>
 \end{lstlisting}
 
 \subsection{Limitations}
@@ -706,7 +712,7 @@ To deploy srsRAN at the battlefield EDGE:
 \end{itemize}
 \item \textbf{Software Installation}:
 \begin{itemize}
-\item Install srsRAN: \texttt{\url{https://github.com/srsran/srsRAN_4G}}, then build using instructions.
+\item Install srsRAN: \texttt{\url{https://github.com/srsran/srsRAN_4G}}, build using instructions.
 \item Install dependencies: UHD drivers (\texttt{libuhd-dev}), Open5GS, and OpenSSL.
 \item Configure kernel for GTP-U: \texttt{modprobe gtp}.
 \end{itemize}
@@ -744,7 +750,7 @@ dl_earfcn = 3350
 tx_gain = 15  % Low power to reduce detectability
 rx_gain = 40
 device_name = uhd
-device_args = type=x300,master_clock_rate=184.32e6,send_frame_size=8000
+device_args = type=x300,master_clock_rate=184.32e6
 
 [enb_files]
 sib_config = sib.conf
@@ -859,7 +865,7 @@ Configures UE (iPhone) settings for network attachment.
 dl_earfcn = 3350
 tx_gain = 80
 device_name = uhd
-device_args = type=x300,master_clock_rate=184.32e6,send_frame_size=8000
+device_args = type=x300,master_clock_rate=184.32e6
 
 [usim]
 mode = soft
