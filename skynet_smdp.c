@@ -1,5 +1,5 @@
 /* Name: skynet_smdp.c
- * Description: Lightweight SMDP+ server for eSIM profile delivery in srsRAN 4G
+ * Description: Lightweight SM-DP+ server for eSIM profile delivery in srsRAN 4G
  * Purpose: Generates GSMA-compliant eSIM profiles for iPhone SE 5G
  * Date: June 21, 2025
  */
