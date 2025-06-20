@@ -734,6 +734,7 @@ To deploy srsRAN at the battlefield EDGE:
 \item \textbf{Configuration Files}: Customize the following srsRAN configuration files (located in \texttt{/root/.config/srsran/}).
 \end{enumerate}
 
+\newpage
 \subsection{Configuration Files}
 Below are key configurations for srsRAN, tailored for battlefield EDGE with Skynet integration.
 Only essential parameters are shown; defaults suffice for others.
@@ -790,8 +791,7 @@ sgi_if_name = srs_spgw_sgi
 \subsubsection{rb.conf}
 Defines QoS for radio bearers, aligned with Skynet’s QoS requirements.
 \begin{lstlisting}
-qci_config = (
-{
+qci_config = ({
   qci = 7;
   pdcp_config
     = { discard_timer = -1;
@@ -805,8 +805,7 @@ qci_config = (
         prioritized_bit_rate = -1;
         bucket_size_duration = 100;
         log_chan_group = 2; }
-},
-{
+},{
   qci = 9;
   pdcp_config
     = { discard_timer = 150;
@@ -823,24 +822,22 @@ qci_config = (
         prioritized_bit_rate = -1;
         bucket_size_duration = 100;
         log_chan_group = 3; }
-}
-);
+});
 \end{lstlisting}
 
 \subsubsection{rr.conf}
 Configures radio resources and cell parameters.
 \begin{lstlisting}
-cell_list = (
-{
+cell_list = ({
   cell_id = 0x01;
   tac = 0x0007;
   pci = 1;
   dl_earfcn = 3350;
   ho_active = false;
-}
-);
+});
 \end{lstlisting}
 
+\newpage
 \subsubsection{sib.conf}
 Defines System Information Blocks for network discovery.
 \begin{lstlisting}
@@ -864,7 +861,7 @@ sib3 = { cell_reselection_common
 \end{lstlisting}
 
 \subsubsection{ue.conf}
-Configures UE (iPhone) settings for network attachment.
+Configures UE (Skynet Client) settings for network attachment.
 \begin{lstlisting}
 [rf]
 dl_earfcn = 3350
@@ -895,7 +892,6 @@ apn_protocol = ipv4
                 \texttt{npg\_pli} (NPG 6) for drone C2 and PLI,
                              using QoS 2 for low-latency C2 (50 ms)
                                and QoS 1 for PLI (100 ms).
-\item Monitor logs (\texttt{enb.log}, \texttt{epc.log}) for connectivity issues.
 \end{enumerate}
 
 \subsection{Security and Visibility}
