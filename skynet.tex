@@ -476,9 +476,10 @@ which coordinate drone swarms using Link32 telecommunication protocol.
 skynet <node>
 \end{lstlisting}
 
-\subsubsection*{Skynet User Equipment Client}
+\subsubsection*{Skynet Client User Equipment}
 Runs the client with FNV-1a hashed \texttt{<node>}.
-Skynet UE Client implements FSM loop of drone telecommunication module.
+Skynet Client implements FSM loop of drone telecommunication module which is using Link32 protocol (IP/UDP)
+while User Equipment implements FSM loop of drone telecommunication module which is using LTE 4G protocol (MAC/RRC/NR/LTE/CELL).
 \begin{lstlisting}
 skynet_client <node>
 \end{lstlisting}

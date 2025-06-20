@@ -95,19 +95,19 @@ typedef struct {
 } sim_state_t;
 
 /* Function declarations */
-static sim_error_t parse_config(const char *filename, sim_params_t *params);
-static sim_error_t pcsc_init(void *state);
-static sim_error_t pcsc_write(void *state, const sim_params_t *params);
-static sim_error_t pcsc_close(void *state);
-static sim_error_t ccid_init(void *state);
-static sim_error_t ccid_write(void *state, const sim_params_t *params);
-static sim_error_t ccid_close(void *state);
-static sim_error_t select_programmer(const char *name, sim_state_t *state);
-static void log_error(const sim_state_t *state, const char *msg);
-static sim_error_t hex_to_bytes(const char *hex, uint8_t *bytes, size_t max_len);
+sim_error_t parse_config(const char *filename, sim_params_t *params);
+sim_error_t pcsc_init(void *state);
+sim_error_t pcsc_write(void *state, const sim_params_t *params);
+sim_error_t pcsc_close(void *state);
+sim_error_t ccid_init(void *state);
+sim_error_t ccid_write(void *state, const sim_params_t *params);
+sim_error_t ccid_close(void *state);
+sim_error_t select_programmer(const char *name, sim_state_t *state);
+void log_error(const sim_state_t *state, const char *msg);
+sim_error_t hex_to_bytes(const char *hex, uint8_t *bytes, size_t max_len);
 
 /* Programmer driver table */
-static const programmer_driver_t programmers[MAX_PROGRAMMERS] = {
+const programmer_driver_t programmers[MAX_PROGRAMMERS] = {
     {
         .name = "PCSC",
         .init = pcsc_init,
@@ -124,7 +124,7 @@ static const programmer_driver_t programmers[MAX_PROGRAMMERS] = {
 };
 
 /* Convert hex string to bytes (e.g., for Ki, OPc) */
-static sim_error_t hex_to_bytes(const char *hex, uint8_t *bytes, size_t max_len) {
+sim_error_t hex_to_bytes(const char *hex, uint8_t *bytes, size_t max_len) {
     size_t len = strlen(hex);
     if (len % 2 != 0 || len / 2 > max_len) {
         return SIM_ERR_INVALID_PARAM;
@@ -142,7 +142,7 @@ static sim_error_t hex_to_bytes(const char *hex, uint8_t *bytes, size_t max_len)
 }
 
 /* PC/SC: Initialize programmer */
-static sim_error_t pcsc_init(void *state) {
+sim_error_t pcsc_init(void *state) {
     pcsc_programmer_t *pcsc = (pcsc_programmer_t *)state;
     LONG rv;
 
@@ -170,7 +170,7 @@ static sim_error_t pcsc_init(void *state) {
 }
 
 /* PC/SC: Write SIM parameters using APDUs */
-static sim_error_t pcsc_write(void *state, const sim_params_t *params) {
+sim_error_t pcsc_write(void *state, const sim_params_t *params) {
     pcsc_programmer_t *pcsc = (pcsc_programmer_t *)state;
     if (params == NULL || pcsc == NULL) {
         return SIM_ERR_INVALID_PARAM;
@@ -246,7 +246,7 @@ static sim_error_t pcsc_write(void *state, const sim_params_t *params) {
 }
 
 /* PC/SC: Close programmer */
-static sim_error_t pcsc_close(void *state) {
+sim_error_t pcsc_close(void *state) {
     pcsc_programmer_t *pcsc = (pcsc_programmer_t *)state;
     LONG rv;
 
@@ -268,7 +268,7 @@ static sim_error_t pcsc_close(void *state) {
 }
 
 /* CCID: Initialize programmer */
-static sim_error_t ccid_init(void *state) {
+sim_error_t ccid_init(void *state) {
     ccid_programmer_t *ccid = (ccid_programmer_t *)state;
     int r;
 
@@ -307,7 +307,7 @@ static sim_error_t ccid_init(void *state) {
 }
 
 /* CCID: Write SIM parameters using APDUs */
-static sim_error_t ccid_write(void *state, const sim_params_t *params) {
+sim_error_t ccid_write(void *state, const sim_params_t *params) {
     ccid_programmer_t *ccid = (ccid_programmer_t *)state;
     if (params == NULL || ccid == NULL || ccid->handle == NULL) {
         return SIM_ERR_INVALID_PARAM;
@@ -391,7 +391,7 @@ static sim_error_t ccid_write(void *state, const sim_params_t *params) {
 }
 
 /* CCID: Close programmer */
-static sim_error_t ccid_close(void *state) {
+sim_error_t ccid_close(void *state) {
     ccid_programmer_t *ccid = (ccid_programmer_t *)state;
     if (ccid->handle != NULL) {
         libusb_release_interface(ccid->handle, 0);
@@ -406,14 +406,14 @@ static sim_error_t ccid_close(void *state) {
 }
 
 /* Log error message to stderr or log file */
-static void log_error(const sim_state_t *state, const char *msg) {
+void log_error(const sim_state_t *state, const char *msg) {
     FILE *out = (state->log_file != NULL) ? state->log_file : stderr;
     fprintf(out, "ERROR: %s\n", msg);
     fflush(out);
 }
 
 /* Parse configuration file for SIM parameters */
-static sim_error_t parse_config(const char *filename, sim_params_t *params) {
+sim_error_t parse_config(const char *filename, sim_params_t *params) {
     FILE *fp;
     char line[MAX_LINE_LEN];
     char key[32];
@@ -487,7 +487,7 @@ static sim_error_t parse_config(const char *filename, sim_params_t *params) {
 }
 
 /* Select programmer by name */
-static sim_error_t select_programmer(const char *name, sim_state_t *state) {
+sim_error_t select_programmer(const char *name, sim_state_t *state) {
     if (name == NULL || state == NULL) {
         return SIM_ERR_INVALID_PARAM;
     }
