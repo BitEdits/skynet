@@ -449,36 +449,41 @@ Sent status message: multicast=239.255.1.0,
 Skynet includes five utilities:
 
 \subsubsection*{Keys Provisioning}
-Generates ECC key pairs.
+Generates ECC key pairs for Skynet Client telecommunication module on User Equipment (UE).
 \begin{lstlisting}
 skynet_keygen <node> [--server|--client]
 \end{lstlisting}
 
 \subsubsection*{Message Encryption}
 Encrypts a test message to \texttt{file.sky}.
+For manual message encryption before manual publishing on topic channel.
 \begin{lstlisting}
 skynet_encrypt <sender> <recipient> <file>
 \end{lstlisting}
 
 \subsubsection*{Message Decryption}
 Decrypts \texttt{<file.sky>}.
+For manual message decryption after recieving on subscribed topic channel.
 \begin{lstlisting}
 skynet_decoder <sender> <recipient> <file.sky>
 \end{lstlisting}
 
 \subsubsection*{Skynet Server}
 Runs the server with FNV-1a hashed \texttt{<node>}.
+Skynet Server implements Link32 Broker along with Channel Protocol Handlers
+which coordinate drone swarms using Link32 telecommunication protocol.
 \begin{lstlisting}
 skynet <node>
 \end{lstlisting}
 
-\subsubsection*{Skynet Client}
+\subsubsection*{Skynet User Equipment Client}
 Runs the client with FNV-1a hashed \texttt{<node>}.
+Skynet UE Client implements FSM loop of drone telecommunication module.
 \begin{lstlisting}
 skynet_client <node>
 \end{lstlisting}
 
-\subsubsection*{Skynet User Equipment SIM-card Programming}
+\subsubsection*{COTS User Equipment SIM-card Programming}
 Flash SIM cards for srsRAN setups with \texttt{PCSC} and \texttt{CCID} supported valued in \texttt{<device>} placeholder.
 \begin{lstlisting}
 skynet_sim <device> <sim.imsi>
@@ -647,7 +652,7 @@ uses ACKs (\texttt{SKYNET\_MSG\_ACK}) with retransmission on timeout (100ms), an
 handshake with strict ordering and deduplication via \texttt{seq\_no}. All Network Protocol Groups
 (NPGs) and message types are mapped to QoS levels, as shown in Table 4.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Skynet QoS Mapping to MQTT and LTE QCI}
 \begin{tabular}{cllllll}
