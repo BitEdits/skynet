@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage{url}
 \usepackage{listings}
 
 \lstset{basicstyle=\footnotesize\ttfamily}
@@ -15,7 +16,7 @@
        in Cluster Hybrid Topologies}
 
 \author{Namdak Tonpa}
-\date{June 15, 2025}
+\date{June 11, 2025}
 \maketitle
 
 \begin{abstract}
@@ -669,6 +670,236 @@ In conclusion, the 3-level hierarchy, inspired by LTE QCI, enables Skynet to rep
 semantics, ensuring scalable, low-latency, and reliable communication for swarm drone coordination and
 other tactical applications.
 
+\newpage
+\section{Deploying Private LTE 4G Network}
+This section provides a concise guide for administrators to deploy a private LTE 4G network
+using srsRAN with a USRP B200mini or USRP X310 FPGA-based Software Defined Radios (SRD)
+and iPhone User Equipment as UE LTE terminals in battlefield EDGE scenarios.
+Private LTE 4G Network acts as a Data Link Layer (Media Access Control) for Skynet,
+which operates as Network and Transport Layer framework for drone swarm coordination.
+It outlines the main functionality of srsRAN, key configuration files, and a technical
+overview of LTE 4G components relevant to the deployment.
+
+\subsection{LTE 4G Overview and srsRAN Components}
+LTE 4G is a cellular standard providing high-speed, low-latency communication through
+a layered architecture. Key components include:
+\begin{itemize}
+\item \textbf{Evolved NodeB (eNB)}: Manages radio resources, handles UE connections, and interfaces with the core network. In srsRAN, the eNB is implemented using a USRP X310 for radio transmission/reception.
+\item \textbf{Evolved Packet Core (EPC)}: Handles network control, authentication, and IP connectivity. srsRAN uses Open5GS or similar for EPC functions (MME, HSS, SP-GW).
+\item \textbf{UE}: Devices (e.g., iPhones) connecting to the eNB. Requires programmable SIMs for private network authentication.
+\item \textbf{Protocol Stack}: Includes PHY (physical layer), MAC (medium access control), RLC (radio link control), PDCP (packet data convergence protocol), and RRC (radio resource control) for reliable data transfer and QoS management.
+\end{itemize}
+
+srsRAN leverages open-source software and COTS hardware (e.g., USRP X310) to create a
+private LTE network, supporting secure, low-latency communication for tactical applications
+like drone coordination and C2C.
+
+\subsection{Deployment Steps}
+To deploy srsRAN at the battlefield EDGE:
+\begin{enumerate}
+\item \textbf{Hardware Setup}:
+\begin{itemize}
+\item Use a USRP X310 with a GPSDO (e.g., Leo Bodnar) for clock synchronization.
+\item Attach a directional antenna (e.g., VERT2450) to minimize RF footprint.
+\item Connect to a rugged server (e.g., Intel NUC, $\sim$\$500) running Ubuntu 22.04+.
+\end{itemize}
+\item \textbf{Software Installation}:
+\begin{itemize}
+\item Install srsRAN: \texttt{git clone \url{https://github.com/srsran/srsRAN_4G}}, then build using instructions.
+\item Install dependencies: UHD drivers (\texttt{libuhd-dev}), Open5GS, and OpenSSL.
+\item Configure kernel for GTP-U: \texttt{modprobe gtp}.
+\end{itemize}
+\item \textbf{Network Configuration}:
+\begin{itemize}
+\item Set up a private IP range (e.g., 172.16.0.0/16) for EPC and eNB.
+\item Ensure firewall allows UDP ports (e.g., 2152 for GTP-U, 36412 for S1AP).
+\end{itemize}
+\item \textbf{SIM Provisioning}:
+\begin{itemize}
+\item Use programmable USIMs (e.g., sysmoUSIM) with custom IMSI and keys.
+\item Update \texttt{user\_db.csv} in \texttt{[hss]} with UE credentials.
+\end{itemize}
+\item \textbf{Configuration Files}: Customize the following srsRAN configuration files (located in \texttt{/root/.config/srsran/}).
+\end{enumerate}
+
+\subsection{Configuration Files}
+Below are key configurations for srsRAN, tailored for battlefield EDGE with Skynet integration.
+Only essential parameters are shown; defaults suffice for others.
+
+\subsubsection{enb.conf}
+Configures the eNB for radio and network settings.
+\begin{lstlisting}
+[enb]
+enb_id = 0x19B
+mcc = 001
+mnc = 01
+mme_addr = 127.0.1.100
+gtp_bind_addr = 127.0.1.1
+s1c_bind_addr = 127.0.1.1
+n_prb = 50
+
+[rf]
+dl_earfcn = 3350
+tx_gain = 15  % Low power to reduce detectability
+rx_gain = 40
+device_name = uhd
+device_args = type=x300,master_clock_rate=184.32e6,send_frame_size=8000
+
+[enb_files]
+sib_config = sib.conf
+rr_config = rr.conf
+rb_config = rb.conf
+\end{lstlisting}
+
+\subsubsection{epc.conf}
+Configures the EPC for authentication and IP connectivity.
+\begin{lstlisting}
+[mme]
+mme_code = 0x1a
+mme_group = 0x0001
+tac = 0x0007
+mcc = 001
+mnc = 01
+mme_bind_addr = 127.0.1.100
+apn = srsapn
+dns_addr = 8.8.8.8
+encryption_algo = EEA2
+integrity_algo = EIA2
+
+[hss]
+db_file = user_db.csv
+
+[spgw]
+gtpu_bind_addr = 127.0.1.100
+sgi_if_addr = 172.16.0.1
+sgi_if_name = srs_spgw_sgi
+\end{lstlisting}
+
+\subsubsection{rb.conf}
+Defines QoS for radio bearers, aligned with Skynet’s QoS requirements.
+\begin{lstlisting}
+qci_config = (
+{
+  qci = 7;
+  pdcp_config
+    = { discard_timer = -1;
+        pdcp_sn_size = 12; }
+  rlc_config
+    = { ul_um = { sn_field_length = 10; };
+        dl_um = { sn_field_length = 10;
+                  t_reordering = 45; }; }
+  logical_channel_config
+    = { priority = 13;
+        prioritized_bit_rate = -1;
+        bucket_size_duration = 100;
+        log_chan_group = 2; }
+},
+{
+  qci = 9;
+  pdcp_config
+    = { discard_timer = 150;
+        status_report_required = true; }
+  rlc_config
+    = { ul_am = { t_poll_retx = 120;
+                  poll_pdu = 64;
+                  poll_byte = 750;
+                  max_retx_thresh = 16; };
+        dl_am = { t_reordering = 50;
+                  t_status_prohibit = 50; }; }
+  logical_channel_config
+    = { priority = 11;
+        prioritized_bit_rate = -1;
+        bucket_size_duration = 100;
+        log_chan_group = 3; }
+}
+);
+\end{lstlisting}
+
+\subsubsection{rr.conf}
+Configures radio resources and cell parameters.
+\begin{lstlisting}
+cell_list = (
+{
+  cell_id = 0x01;
+  tac = 0x0007;
+  pci = 1;
+  dl_earfcn = 3350;
+  ho_active = false;
+}
+);
+\end{lstlisting}
+
+\subsubsection{sib.conf}
+Defines System Information Blocks for network discovery.
+\begin{lstlisting}
+sib1 = { intra_freq_reselection = "Allowed";
+         q_rx_lev_min = -65;
+         cell_barred = "NotBarred";
+         si_window_length = 20; }
+sib2 = { rr_config_common_sib
+           = { rach_cnfg = { num_ra_preambles = 52;
+                             preamble_init_rx_target_pwr = -104;
+                             pwr_ramping_step = 6;
+                             ra_resp_win_size = 10;
+                             mac_con_res_timer = 64;
+                             max_harq_msg3_tx = 4; }; }; }
+sib3 = { cell_reselection_common
+           = { q_hyst = 2; };
+         intra_freq_reselection
+           = { q_rx_lev_min = -61;
+               p_max = 23;
+               s_intra_search = 5; }; }
+\end{lstlisting}
+
+\subsubsection{ue.conf}
+Configures UE (iPhone) settings for network attachment.
+\begin{lstlisting}
+[rf]
+dl_earfcn = 3350
+tx_gain = 80
+device_name = uhd
+device_args = type=x300,master_clock_rate=184.32e6,send_frame_size=8000
+
+[usim]
+mode = soft
+algo = milenage
+opc = 63BFA50EE6523365FF14C1F45F88737D
+k = 00112233445566778899aabbccddeeff
+imsi = 001010123456780
+imei = 353490069873319
+
+[nas]
+apn = srsapn
+apn_protocol = ipv4
+\end{lstlisting}
+
+\subsection{Operation}
+\begin{enumerate}
+\item Start EPC: \texttt{srsmbd -c epc.conf}.
+\item Start eNB: \texttt{srsenb -c enb.conf}.
+\item Configure iPhones with programmable USIMs and attach to the network (MCC=001, MNC=01).
+\item Integrate with Skynet:
+       Configure \texttt{npg\_c2} (NPG 100) and
+                \texttt{npg\_pli} (NPG 6) for drone C2 and PLI,
+                             using QoS 2 for low-latency C2 (50 ms)
+                               and QoS 1 for PLI (100 ms).
+\item Monitor logs (\texttt{enb.log}, \texttt{epc.log}) for connectivity issues.
+\end{enumerate}
+
+\subsection{Security and Visibility}
+\begin{itemize}
+\item \textbf{Encryption}: Use AES-256 (EEA2) and integrity protection (EIA2) in \texttt{epc.conf} to secure communications.
+\item \textbf{Low Visibility}: Set \texttt{tx\_gain = 15} and use directional antennas to minimize RF footprint.
+\item \textbf{Interference Mitigation}: Select Band 3 (EARFCN 3350) to avoid commercial spectrum.
+\end{itemize}
+
+\subsection{Troubleshooting}
+\begin{itemize}
+\item \textbf{UE Connection Issues}: Verify IMSI in \texttt{user\_db.csv}, ensure \texttt{dl\_earfcn} matches, and check GPSDO synchronization.
+\item \textbf{GTP-U Errors}: Ensure \texttt{modprobe gtp} and correct \texttt{gtpu\_bind\_addr}.
+\item \textbf{Logs}: Set \texttt{all\_level = debug} in \texttt{enb.conf} and \texttt{epc.conf} for detailed diagnostics.
+\end{itemize}
+
 \section{Dedication}
 The Skynet is dedicated to Vitalii Karvatskyi.
 
@@ -684,7 +915,7 @@ scalable solution for coordinating 5,000 MAVs over a 30 km radius,
 with each drone transmitting a 100-byte payload at 10 Hz and 5--10 cluster
 leads streaming 200 kbps video for C2C monitoring. The hybrid architecture,
 combining a terrestrial base station and UAV relay, achieves full coverage
-at a cost of approximately \$8,400, leveraging open-source srsRAN and COTS
+at a cost of approximately $\sim$ \$10,000, leveraging open-source srsRAN and COTS
 hardware. Key algorithms, including PSO, DRL, and consensus-based methods,
 enable efficient path planning, collision avoidance, task allocation,
 formation control, and communication optimization. Future work should
