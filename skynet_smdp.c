@@ -13,7 +13,7 @@
 #include <microhttpd.h>
 
 /* Configuration constants */
-#define SMDP_PORT 8080
+#define SMDP_PORT 443
 #define MAX_IMSI_LEN 16
 #define MAX_KI_LEN 33
 #define MAX_OPC_LEN 33
