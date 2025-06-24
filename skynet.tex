@@ -24,8 +24,9 @@
 Coordinating large-scale drone swarms in battlefield or demonstration scenarios
 is a complex challenge, particularly under constraints of cost, scalability,
 and communication reliability. This article addresses the problem of designing an affordable,
-LTE 4G-based swarm coordination framework for micro air vehicles (MAVs) using cluster hybrid
-topologies, with low-resolution video streams from cluster lead drones for
+LTE 4G-based swarm coordination framework for unmanned aerial vehicle (UAV)
+or micro air vehicles (MAV) using cluster hybrid topologies,
+with low-resolution video streams from cluster lead drones for
 command-and-control (C2C) monitoring. We propose a hybrid architecture combining
 terrestrial and UAV-based base stations, leveraging low-bandwidth
 payloads (100 bytes at 10 Hz) and minimal video streaming (200 kbps per cluster lead).
@@ -47,8 +48,93 @@ robust performance in mission-critical scenarios.
 \newpage
 \tableofcontents
 
+\section{Introduction to UAV/MAV classes}
+Each UAV class has distinct roles, payloads, and operational requirements,
+analogous to military aircraft. These roles drive their communication needs
+in terms of data type, frequency, priority, and reliability.
+
+\subsection{Scout (Reconnaissance UAV)}
+Comparable to reconnaissance aircraft like the RQ-4 Global Hawk or U-2 Dragon Lady.
+Primary function is surveillance, intelligence gathering, and real-time situational awareness.
+Scouts collect data (e.g., imagery, sensor readings) and transmit Position Location
+Information (PLI), sensor feeds, and alerts.
+
+\textbf{Communication Needs}.
+Data Types: PLI (position, velocity), high-frequency sensor data (e.g., EO/IR imagery), and network alerts.
+Frequency: High-frequency updates (10 Hz for PLI, ~1 Hz for sensor data).
+Priority: Medium to high (timely intelligence is critical but not as urgent as C2).
+Reliability: Reliable delivery for PLI and alerts, best-effort for non-critical sensor data.
+Bandwidth: Moderate (100-byte PLI at 10 Hz ~ 9.6 kbps; 200 kbps for low-resolution video).
+
+\textbf{Requirements}.
+High data volume from sensors, need for robust encryption,
+and operation in contested environments with potential jamming.
+
+\subsection{Bomber (Heavy Payload UAV)}
+Similar to strategic bombers like the B-2 Spirit or B-1 Lancer.
+Delivers heavy payloads (e.g., precision-guided munitions) to strategic targets,
+requiring precise navigation and command-and-control (C2) coordination.
+
+\textbf{Communication Needs}.
+Data Types: C2 (waypoints, target assignments), PLI, and status updates (e.g., payload status).
+Frequency: Moderate (C2 updates at ~1 Hz, PLI at 5–10 Hz).
+Priority: Very high (mission-critical C2 commands require low latency).
+Reliability: Exactly-once delivery for C2, reliable for PLI.
+Bandwidth: Low to moderate (100-byte C2/PLI at 5–10 Hz ~ 4.8–9.6 kbps).
+
+\textbf{Requirements}.
+Low-latency C2 for real-time targeting, secure communication to avoid interception,
+and coordination with other UAVs for swarm operations.
+
 \newpage
-\section{Introduction}
+\subsection{Interceptor (Anti-UAV/Countermeasure UAV)}
+Comparable to air superiority fighters like the F-22 Raptor.
+Engages and neutralizes enemy UAVs or missiles, requiring rapid response and dynamic coordination.
+
+\textbf{Communication Needs}.
+Data Types: C2 (target tracking, engagement orders), PLI, and alerts (e.g., threat detection).
+Frequency: High (PLI and alerts at 10 Hz, C2 at ~2 Hz).
+Priority: Very high (real-time engagement demands sub-50ms latency).
+Reliability: Exactly-once for C2 and alerts, reliable for PLI.
+Bandwidth: Moderate (100-byte messages at 10 Hz ~ 9.6 kbps).
+
+\textbf{Requirements}.
+Ultra-low latency for real-time threat response, robust anti-jamming,
+and coordination with other interceptors for swarm-based defense.
+
+\subsection{Fighter (Multi-Role UAV)}
+Similar to multi-role fighters like the F-16 Falcon or F-35 Lightning II.
+Performs a mix of reconnaissance, strike, and air superiority tasks, requiring flexibility in communication for diverse missions.
+
+\textbf{Communication Needs}.
+Data Types: C2, PLI, sensor data, tactical chat, and formation control.
+Frequency: Variable (PLI at 10 Hz, C2 at 1–2 Hz, sensor data at ~1 Hz).
+Priority: High for C2 and formation, medium for sensor data and chat.
+Reliability: Exactly-once for C2, reliable for PLI and formation, best-effort for chat.
+Bandwidth: Moderate to high (9.6 kbps for PLI, 200 kbps for video, ~1 kbps for chat).
+
+\textbf{Requirements}.
+Balancing diverse traffic types, maintaining formation in dynamic environments,
+and ensuring scalability in mixed swarms.
+
+\subsection{Attack (Close Air Support UAV)}
+Comparable to attack aircraft like the A-10 Thunderbolt II or AH-64 Apache.
+Provides close air support, engaging ground targets with precision munitions,
+often in coordination with ground forces.
+
+\textbf{Communication Needs}.
+Data Types: C2 (target coordinates, engagement orders), PLI, tactical chat, and status updates.
+Frequency: Moderate to high (C2 at 1–2 Hz, PLI at 10 Hz, chat at ~0.1 Hz).
+Priority: High for C2, medium for PLI and chat.
+Reliability: Exactly-once for C2, reliable for PLI, best-effort for chat.
+Bandwidth: Moderate (9.6 kbps for PLI, ~1 kbps for chat, ~5 kbps for C2).
+
+\textbf{Requirements}.
+Close coordination with ground units, low-latency C2 for real-time targeting,
+and resilience to battlefield interference.
+
+\newpage
+\section{Protocol Requirements}
 Link32 is a tactical real-time communication protocol inspired by standards such as
 VMF, TSM, SRW, TDL \cite{tdl} (message formats) along with MQTT \cite{mqtt5},
 LTE (HSS, PDCP, MME, QCI), Link16 \cite{link16std} (telecommunication protocols),
@@ -76,7 +162,46 @@ video (200 kbps) for C2C monitoring. We focus on a 30 km radius operational
 area, addressing the challenges of bandwidth, latency, and cost through
 hybrid architectures and optimized algorithms.
 
-\section{Problem Statement}
+The Link32 protocol and Skynet implementation must address
+the following requirements to support these UAV classes:
+
+\begin{itemize}
+\item Low Latency: Critical for C2 and alerts (sub-50ms for Interceptor, Bomber, Fighter, Attack).
+\item Reliability: Exactly-once delivery for C2 (QoS 2), reliable delivery for PLI (QoS 1), and best-effort for chat and non-critical sensor data (QoS 0).
+\item Scalability: Support up to 5,000 UAVs, with cluster-based organization (50–100 drones per cluster) to manage bandwidth (~50 Mbps uplink).
+\item Security: AES-256-GCM, ECDH SECP384R1 in contested environments.
+\item Bandwidth Efficiency: Optimize multicast topics to minimize overhead, using compact 100-byte payloads at 10 Hz and 200 kbps video streams for cluster leads.
+\item Dynamic Adaptation: Support dynamic TDMA slot allocation and topic subscriptions based on UAV roles and mission requirements.
+\item Interoperability: Map to MQTT QoS levels for integration with existing tactical communication systems.
+\end{itemize}
+
+\subsection{Principles, Properties and Problem Statement}
+Link32 adheres to the following design principles:
+\begin{itemize}
+    \item \textbf{Threat Model}: Confidentiality and integrity, no non-repudiation.
+    \item \textbf{Latency}: Microsecond-precision timings .
+    \item \textbf{Implementation}: Written in C99 for portability and performance.
+    \item \textbf{Key Provisioning}: Key distribution for controlled setup.
+    \item \textbf{Mandatory Encryption}: All messages encrypted with AES-256-GCM.
+    \item \textbf{Node Identification}: Node names hashed to 32-bit using FNV-1a.
+    \item \textbf{Lock-Free Design}: Uses atomic compare-and-swap for concurrency.
+    \item \textbf{Topic Architecture}: Topics map to IP multicast groups.
+    \item \textbf{Queue Management}: Global network queue, per-topic subscribes.
+    \item \textbf{Key Storage}: Separate key stores per executable.
+\end{itemize}
+
+%\subsection{Properties}
+Link32 and Skynet are designed with the following properties:
+\begin{itemize}
+    \item \textbf{Message Size}: 32-byte header (48 bytes payload with GCM tag).
+    \item \textbf{Security}: ECDH key exchange SECP384R1, Mandatory AES-256-GCM.
+    \item \textbf{Non-blocking}: Using monotonic clocks and non-blocking I/O.
+    \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
+    \item \textbf{Swarm Scalability}: Supports large-scale drone swarms.
+    \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
+\end{itemize}
+
+%\subsection{Problem Statement}
 % Defining the specific problem of affordable swarm coordination
 The problem is to design a cost-effective LTE 4G-based communication and coordination system for a swarm of approximately 5,000 MAVs operating over a 30 km radius in a battlefield or demonstration setting. Each drone sends a 100-byte payload (position, velocity, tactical data) at 10 Hz, requiring approximately 9.6 kbps per drone, while 5--10 cluster lead drones stream low-resolution video at 200 kbps each for C2C monitoring. The total uplink bandwidth is approximately 50 Mbps. The system must:
 \begin{itemize}
@@ -87,23 +212,23 @@ The problem is to design a cost-effective LTE 4G-based communication and coordin
 \end{itemize}
 Challenges include limited bandwidth, latency constraints, signal interference in battlefield environments, and the need for decentralized control to scale to thousands of drones.
 
-\section{Cluster Hybrid Topology}
+\subsection{Cluster Hybrid Topology}
 % Describing the hybrid architecture for swarm coordination
 To address the problem, we propose a cluster hybrid topology combining a terrestrial LTE 4G base station with one or more UAV-based aerial base stations (ABSs). The architecture is designed for affordability and scalability, leveraging open-source solutions and COTS hardware.
 
-\subsection{Terrestrial Base Station}
+\subsubsection{Terrestrial Base Station}
 % Outlining the terrestrial component
 A single terrestrial base station, implemented using srsRAN with a LimeSDR Mini (cost: $\sim$\$1,500), provides core coverage of 10--15 km. A high-gain omnidirectional antenna (e.g., Laird FG24008, $\sim$\$150) and a 20 W RF amplifier ($\sim$\$500) extend the range toward 20 km. The base station connects to an open-source Evolved Packet Core (EPC) like Open5GS on a low-cost server ($\sim$\$500), handling up to 2,000 simultaneous connections.
 
-\subsection{UAV-Based Aerial Base Station}
+\subsubsection{UAV-Based Aerial Base Station}
 % Describing the UAV relay component
 One custom-built UAV (cost: $\sim$\$2,000) equipped with a LimeSDR Mini ($\sim$\$300) and a lightweight antenna (e.g., Taoglas GW.26, $\sim$\$50) serves as an aerial base station at 100--120 m altitude, extending coverage to 20--30 km via line-of-sight (LoS) propagation. The UAV rotates with spares to ensure continuous operation, supported by a portable generator ($\sim$\$1,100) and battery swap system ($\sim$\$300).
 
-\subsection{Cluster-Based Swarm Organization}
+\subsubsection{Cluster-Based Swarm Organization}
 % Explaining the clustering approach
 The swarm is organized into clusters of 50--100 drones, each led by a cluster head responsible for intra-cluster coordination and LTE communication with the base station. Cluster heads transmit 100-byte payloads (9.6 kbps) and, for 5--10 designated leaders, low-resolution video streams (200 kbps). Drone-to-drone (D2D) communication via LTE sidelink reduces network load, enabling scalability to 5,000 drones within the 50 Mbps uplink capacity.
 
-\subsection{Backhaul and Ground Control}
+\subsubsection{Backhaul and Ground Control}
 % Detailing connectivity and control
 A point-to-point microwave link (e.g., Ubiquiti airFiber 24, $\sim$\$1,500) or satellite terminal (e.g., Starlink, $\sim$\$600) provides backhaul to a command center. A rugged laptop with open-source software like QGroundControl ($\sim$\$500) manages UAV flight and network configuration. Total cost is approximately \$8,400, making the system affordable for battlefield or demonstration use.
 
@@ -224,33 +349,6 @@ EPOS is a decentralized multi-agent learning algorithm that optimizes energy con
 This method uses graph neural networks to enable dual-objective control (task completion, energy efficiency), enhancing communication efficiency in cluster-based topologies \cite{Zhang2020, Wang2021}.
 
 
-\subsection{Principles}
-Link32 adheres to the following design principles:
-\begin{itemize}
-    \item \textbf{Threat Model}: Confidentiality and integrity, no non-repudiation.
-    \item \textbf{Latency}: Microsecond-precision timings .
-    \item \textbf{Implementation}: Written in C99 for portability and performance.
-    \item \textbf{Key Provisioning}: Key distribution for controlled setup.
-    \item \textbf{Mandatory Encryption}: All messages encrypted with AES-256-GCM.
-    \item \textbf{Node Identification}: Node names hashed to 32-bit using FNV-1a.
-    \item \textbf{Lock-Free Design}: Uses atomic compare-and-swap for concurrency.
-    \item \textbf{Topic Architecture}: Topics map to IP multicast groups.
-    \item \textbf{Queue Management}: Global network queue, per-topic subscribes.
-    \item \textbf{Key Storage}: Separate key stores per executable.
-\end{itemize}
-
-\newpage
-
-\subsection{Properties}
-Link32 and Skynet are designed with the following properties:
-\begin{itemize}
-    \item \textbf{Message Size}: 32-byte header (48 bytes payload with GCM tag).
-    \item \textbf{Security}: ECDH key exchange SECP384R1, Mandatory AES-256-GCM.
-    \item \textbf{Non-blocking}: Using monotonic clocks and non-blocking I/O.
-    \item \textbf{Footprint}: $\sim$64KB L1 cache usage, $\sim$2000 lines of code (LOC).
-    \item \textbf{Swarm Scalability}: Supports large-scale drone swarms.
-    \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
-\end{itemize}
 
 \section{Link32 Protocol}
 
@@ -300,23 +398,23 @@ The protocol defines seven message types, as shown in Table 1.
 \end{table}
 
 \subsection{Multicast Topics}
-Link32 uses multicast topics mapped to IP multicast groups, as in Table 2.
+Link32 uses multicast topics mapped to IP multicast groups 239.255.0.*, where * is NPG identifier as in Table 2.
 
 \begin{table}[h]
 \centering
 \caption{Multicast Topics}
 \begin{tabular}{cllp{5cm}}
 \hline
-\textbf{NPG} & \textbf{Name} & \textbf{Multicast} & \textbf{Purpose} \\
+\textbf{NPG} & \textbf{Name} & \textbf{Purpose} \\
 \hline
-1   & npg\_control      & 239.255.0.1   & Kkey exchange, Slot requests. \\
-6   & npg\_pli          & 239.255.0.6   & Position information (status). \\
-7   & npg\_surveillance & 239.255.0.7   & Sensor data forwarding. \\
-29  & npg\_chat         & 239.255.0.29  & Tactical chat and acks. \\
-100 & npg\_c2           & 239.255.0.100 & C2 (waypoints, formations). \\
-101 & npg\_alerts       & 239.255.0.101 & Network alerts and self-healing. \\
-102 & npg\_logistics    & 239.255.0.102 & Logistical coordination. \\
-103 & npg\_coord        & 239.255.0.103 & Swarm Coordination. \\
+1   & npg\_control      & Key exchange, Slot requests, Ack. \\
+6   & npg\_pli          & All Position/Velocity updates. \\
+7   & npg\_surveillance & Scout, Fighter. \\
+29  & npg\_chat         & Tactical chat and acks. \\
+100 & npg\_c2           & C2, Bomber, Interceptor, Fighter, Attack. \\
+101 & npg\_alerts       & Scout, Interceptor, Fighter. \\
+102 & npg\_logistics    & Bomber, Attack. \\
+103 & npg\_coord        & Fighter, Attack. \\
 \hline
 \end{tabular}
 \end{table}
@@ -933,6 +1031,19 @@ for battlefield reliability.
 
 \begin{thebibliography}{10}
 
+% UAV/MAC Classification and Requirements
+
+\bibitem{Fotouhi2019} Fotouhi, A., et al., ``Survey on UAV Cellular Communications: Practical Aspects, Standardization Advancements, Regulation, and Security Challenges,'' \textit{arXiv preprint arXiv:1809.01752}, 2019.
+\bibitem{Muruganathan2021} Muruganathan, S. D., et al., ``An Overview of 3GPP Release-15 Study on Enhanced LTE Support for Connected Drones,'' \textit{IEEE Communications Standards Magazine}, vol. 5, no. 4, pp. 140--146, 2021.
+\bibitem{Awasthi2020} Awasthi, S., et al., ``Artificial Intelligence Supervised Swarm UAVs for Reconnaissance,'' \textit{Data Science and Analytics: 5th International Conference on Recent Developments in Science, Engineering and Technology, REDSET 2019, Gurugram, India, November 15--16, 2019, Revised Selected Papers, Part I 5}, Springer, pp. 375--388, 2020.
+\bibitem{Nguyen2018} Nguyen, H. C., et al., ``How to Ensure Reliable Connectivity for Aerial Vehicles Over Cellular Networks,'' \textit{IEEE Access}, vol. 6, pp. 12304--12317, 2018.
+\bibitem{Yue2018} Yue, X., et al., ``Software Defined Radio and Wireless Acoustic Networking for Amateur Drone Surveillance,'' \textit{IEEE Communications Magazine}, vol. 56, no. 4, pp. 90--97, 2018.
+\bibitem{Shakhatreh2023} Shakhatreh, H., et al., ``A Survey on UAV-Assisted Wireless Communications: Recent Advances and Future Trends,'' \textit{ScienceDirect}, 2023.
+\bibitem{Wang2022} Wang, J., and Jiang, C., \textit{Flying Ad Hoc Networks}, Springer, 2022.
+\bibitem{Sai2023} Sai, S., et al., ``A Comprehensive Survey on Artificial Intelligence for Unmanned Aerial Vehicles,'' \textit{IEEE Open Journal of Vehicular Technology}, vol. 4, pp. 713--738, 2023.
+\bibitem{Alqudsi2024} Alqudsi, Y., ``Coordinated Formation Control for Swarm Flying Robots,'' \textit{2024 1st International Conference on Emerging Technologies for Dependable Internet of Things (ICETI)}, IEEE, Sana’a, Yemen, pp. 1--8, 2024.
+\bibitem{Colomina2014} Colomina, I., and Molina, P., ``Unmanned Aerial Vehicles and Their Applications in Remote Sensing,'' \textit{Survey Review}, vol. 46, no. 336, pp. 159--174, 2014.
+
 % Link32 Protocol and Related Information
 
 \bibitem{tdl} U.S. Department of Defense, ``MIL-STD-6016: Tactical Data Link (TDL) J-Message Standard,'' 2008.
@@ -1004,6 +1115,8 @@ for battlefield reliability.
 \bibitem{Liu2021} Liu, Q., and Zhang, Y., ``Energy-Aware Task Allocation for UAV Swarms Using EPOS,'' \textit{Journal of Intelligent and Robotic Systems}, vol. 103, no. 2, pp. 34--45, 2021.
 \bibitem{Zhang2020} Zhang, K., and Yang, Z., ``Graph Attention Networks for UAV Swarm Control,'' \textit{IEEE Transactions on Neural Networks and Learning Systems}, vol. 31, no. 10, pp. 4012--4023, 2020.
 \bibitem{Wang2021} Wang, H., and Li, J., ``Decentralized Actor-Critic for Multi-UAV Coordination,'' \textit{IEEE International Conference on Robotics and Automation}, pp. 5678--5684, 2021.
+
+
 
 \end{thebibliography}
 
