@@ -10,13 +10,14 @@
 
 \begin{document}
 
-\title{ An Open Source                          \\
-        Tactical Communication Protocol Link32   \\
-        and Skynet Reference Implementation       \\
-        for Drone Swarm Coordination \\
-        in Cluster Hybrid Topologies  \\
-        Operating in Software Defined  \\
-        Local LTE 4G/5G Networks        \\ }
+% OSGA TCP SRI DSC CHT LTE 4G
+
+\title { Open-Source Governance Architecture       \\
+         and Tactical Communication Protocol Link32 \\
+         with Skynet Reference Implementation        \\
+         for Drone Swarm Coordination \\
+         in Cluster Hybrid Topologies  \\
+         over Local LTE 4G/5G Networks  \\ }
 
 \author{Namdak Tonpa}
 \date{June 11, 2025}
@@ -50,6 +51,106 @@ robust performance in mission-critical scenarios.
 \newpage
 \tableofcontents
 
+\section{Open Source Governance}
+% Articulating the governance model for open-source components
+The Skynet/Link32 framework adopts an open-source governance model to balance
+the dual objectives of fostering collaborative development and ensuring military-grade security.
+This section outlines the governance principles, delineates the separation of
+public and private protocol components, and addresses the motivations and
+benefits of open-sourcing parts of the system, particularly for simulation,
+research, and interoperability with commercial systems. By adhering to a
+structured governance model, Skynet mitigates risks associated with open-source
+development while maximizing its utility for academic, industrial,
+and military stakeholders.
+
+\subsection{Governance Principles}
+% Establishing a robust governance framework
+The open-source governance of Skynet/Link32 is guided by the following principles,
+designed to withstand scrutiny from security, scalability, and interoperability perspectives:
+\begin{itemize}
+    \item \textbf{Modular Separation}: The protocol is divided into public and private components. Public fields, such as common message headers and payload structures (e.g., \texttt{SkyNetMessage} version, type, and QoS fields), are openly documented and compatible with commercial-off-the-shelf (COTS) appliances, ensuring interoperability. Private fields, containing sensitive military data (e.g., tactical C2 payloads, encrypted sensor data), are abstracted and inaccessible to non-authorized entities, safeguarding mission-critical information.
+    \item \textbf{Transparency and Collaboration}: Public components, including the core Link32 protocol specification, Skynet server implementation, and simulation tools, are released under an open-source license (e.g., MIT or Apache 2.0) to encourage community contributions, academic research, and third-party validation. This transparency fosters trust and accelerates innovation in UAV swarm coordination algorithms.
+    \item \textbf{Security by Design}: Private components, such as cryptographic key management, proprietary algorithms, and military-specific payloads, are maintained in closed-source modules or referenced via private tables. These are protected by AES-256-GCM encryption and ECDH key exchange (SECP384R1), ensuring compliance with military security standards (e.g., MIL-STD-6016).
+    \item \textbf{Community Oversight}: A governance board, comprising xAI representatives, academic partners, and military stakeholders, oversees contributions, reviews code for security vulnerabilities, and ensures alignment with tactical requirements. Contributions to public components undergo rigorous peer review to prevent backdoors or exploits.
+    \item \textbf{Version Control and Auditability}: All open-source components are versioned and hosted on a public repository (e.g., GitHub: \url{https://github.com/BitEdits/skynet}. Comprehensive audit logs track changes, ensuring traceability and accountability.
+\end{itemize}
+
+\subsection{Public and Private Payload Separation}
+% Detailing the separation mechanism
+The Link32 protocol employs a clear delineation between public and private payloads
+within the \texttt{SkyNetMessage} structure to address security concerns while
+enabling interoperability. Public fields, are standardized and documented in the open-source specification,
+allowing commercial appliances (e.g., srsRAN-based LTE systems) to process message headers
+without accessing sensitive data. The \texttt{payload} field, which may contain
+military-specific data (e.g., waypoints, sensor readings), is encrypted
+using AES-256-GCM with a 16-byte initialization vector (\texttt{iv}) and a 16-byte
+authentication tag, rendering it opaque to unauthorized systems.
+
+Private payloads are further abstracted through reference tables,
+which define proprietary data structures (e.g., tactical C2 formats) accessible
+only to authorized nodes with pre-provisioned keys. For example
+message for a Bomber UAV includes a public header (NPG 100, QoS 2) and a private
+payload (encrypted coordinates), ensuring that commercial LTE base stations can
+route the message without decrypting its contents. This separation mitigates
+risks of reverse-engineering while enabling integration with COTS hardware,
+such as LimeSDR Mini or USRP X310, as described in Section 8.
+
+\subsection{Motivations for Open-Source Approach}
+% Justifying the open-source strategy
+The decision to open-source select components of Skynet/Link32 is driven
+by strategic objectives that address potential criticisms regarding security,
+scalability, and community engagement:
+\begin{itemize}
+    \item \textbf{Interoperability with Commercial Systems}:
+    By exposing public fields and protocol specifications,
+    Skynet ensures compatibility with commercial LTE 4G infrastructure,
+    reducing deployment costs. This enables seamless integration with
+    open-source tools like srsRAN and Open5GS, broadening adoption in
+    both military and civilian contexts.
+    \item \textbf{Research and Simulation}: Open-sourcing the core protocol
+    and simulation tools (e.g., Skynet server, client utilities) provides
+    researchers with a platform to develop and test UAV swarm algorithms,
+    such as those for path planning (A*, PSO) and formation control (consensus-based).
+    This fosters academic collaboration and accelerates innovation without
+    compromising military-specific components.
+    \item \textbf{Community Validation}:
+    Public scrutiny of open-source code enhances security by allowing
+    independent researchers to identify and fix vulnerabilities,
+    reducing the risk of zero-day exploits. For example, the QoS
+    handling is openly auditable, ensuring robust performance under
+    diverse network conditions.
+    \item \textbf{Cost Efficiency}:
+    Leveraging open-source software and COTS hardware minimizes development
+    and maintenance costs, addressing criticisms about affordability in
+    large-scale deployments (e.g., 5,000 UAVs over 30 km).
+\end{itemize}
+
+\subsection{Addressing Criticisms}
+% Countering potential objections
+Critics may argue that open-sourcing any part of a military communication
+protocol risks security breaches or reduces control over proprietary technology.
+These concerns are addressed as follows:
+\begin{itemize}
+    \item \textbf{Security Risks}:
+    The modular separation of public and private components ensures
+    that sensitive data remains encrypted and inaccessible.
+    Only authorized nodes with ECDH-derived AES keys can decrypt private payloads,
+    and manual key provisioning is being enhanced with automated distribution
+    to further secure access. The open-source community's ability to audit
+    public code strengthens, rather than weakens, security
+    by identifying vulnerabilities early.
+    \item \textbf{Loss of Proprietary Control}:
+    Private payloads and algorithms are maintained in closed-source
+    modules or referenced via proprietary tables, ensuring that military-specific
+    intellectual property remains protected. The governance board retains
+    authority over which components are open-sourced, preventing unauthorized disclosures.
+    \item \textbf{Interoperability Overhead}: Public fields are designed
+    to align with standards like MQTT (ISO/IEC 20922:2016) and LTE QCI (3GPP TS 23.203),
+    ensuring compatibility without compromising performance. The NPG-to-MQTT
+    mapping demonstrates this alignment, with QoS levels optimized for tactical needs.
+\end{itemize}
+
+\newpage
 \section{Introduction to UAV/MAV classes}
 Each UAV class has distinct roles, payloads, and operational requirements,
 analogous to military aircraft. These roles drive their communication needs
@@ -177,7 +278,7 @@ the following requirements to support these UAV classes:
 \item Interoperability: Map to MQTT QoS levels for integration with existing tactical communication systems.
 \end{itemize}
 
-\subsection{Principles, Properties and Problem Statement}
+\subsection{Principles}
 Link32 adheres to the following design principles:
 \begin{itemize}
     \item \textbf{Threat Model}: Confidentiality and integrity, no non-repudiation.
@@ -192,7 +293,7 @@ Link32 adheres to the following design principles:
     \item \textbf{Key Storage}: Separate key stores per executable.
 \end{itemize}
 
-%\subsection{Properties}
+\subsection{Properties}
 Link32 and Skynet are designed with the following properties:
 \begin{itemize}
     \item \textbf{Message Size}: 32-byte header (48 bytes payload with GCM tag).
@@ -203,7 +304,7 @@ Link32 and Skynet are designed with the following properties:
     \item \textbf{Dependencies}: Single dependency on OpenSSL for cryptography.
 \end{itemize}
 
-%\subsection{Problem Statement}
+\subsection{Problem Statement}
 % Defining the specific problem of affordable swarm coordination
 The problem is to design a cost-effective LTE 4G-based communication and coordination system for a swarm of approximately 5,000 MAVs operating over a 30 km radius in a battlefield or demonstration setting. Each drone sends a 100-byte payload (position, velocity, tactical data) at 10 Hz, requiring approximately 9.6 kbps per drone, while 5--10 cluster lead drones stream low-resolution video at 200 kbps each for C2C monitoring. The total uplink bandwidth is approximately 50 Mbps. The system must:
 \begin{itemize}
