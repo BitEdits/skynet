@@ -1,3 +1,68 @@
+Vehicle: Vampire
+Category: Air
+Weight: 0.030 tons
+Payload Weight: 0.015 tons
+Time Inflight: Data unavailable
+Altitude Range: 0-400 m
+Size: Length: 1.2 m, Width: 1.2 m, Height: 0.5 m
+Speed: 40 km/h
+Manufacturer: SkyFall
+Role: Strike and Reconnaissance UAV
+Status: Active
+Flight Range: 10 km
+
+Vehicle: Mini SHARK
+Category: Air
+Weight: 0.005 tons
+Payload Weight: Data unavailable
+Time Inflight: 2 hours
+Altitude Range: 0-2,000 m
+Size: Length: 1.5 m, Wingspan: 2.0 m, Height: 0.4 m
+Speed: 100 km/h
+Manufacturer: Ukrspecsystems
+Role: Reconnaissance and Fire Adjustment UAV
+Status: Active
+Flight Range: 30 km
+
+Vehicle: SHARK
+Category: Air
+Weight: 0.012 tons
+Payload Weight: Data unavailable
+Time Inflight: 4 hours
+Altitude Range: 0-3,000 m
+Size: Length: 2.0 m, Wingspan: 4.0 m, Height: 0.6 m
+Speed: 120 km/h
+Manufacturer: Ukrspecsystems
+Role: Reconnaissance and Fire Adjustment UAV
+Status: Active
+Flight Range: 80 km
+
+Vehicle: PD-2
+Category: Air
+Weight: 0.055 tons
+Payload Weight: 0.003 tons
+Time Inflight: 8 hours
+Altitude Range: 0-5,000 m
+Size: Length: 2.5 m, Wingspan: 3.5 m, Height: 0.8 m
+Speed: 140 km/h
+Manufacturer: Ukrspecsystems
+Role: Reconnaissance and Combat UAV
+Status: Active
+Flight Range: 180 km
+
+Vehicle: Ан-196 Лютий
+Category: Air
+Weight: 0.275 tons
+Payload Weight: 0.075 tons
+Time Inflight: Data unavailable
+Altitude Range: Data unavailable
+Size: Length: 4.4 m, Wingspan: 6.7 m, Height: Data unavailable
+Speed: Data unavailable
+Manufacturer: Antonov
+Role: Kamikaze Drone
+Status: Active
+Flight Range: 1000 km
+
 Vehicle: Фантом
 Category: Ground
 Weight: 0.15 tons
