@@ -836,8 +836,6 @@ Vehicle: Катран U53
 Category: Sea
 Weight: 10 tons
 Payload Weight: 2 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 15.0 m, Width: 4.0 m, Height: 3.0 m
 Speed: 80 km/h
 Manufacturer: Unik Yachts
@@ -848,8 +846,6 @@ Vehicle: Орлан
 Category: Sea
 Weight: 20 tons
 Payload Weight: 5 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 20.0 m, Width: 5.0 m, Height: 4.0 m
 Speed: 70 km/h
 Manufacturer: Unknown
@@ -860,8 +856,6 @@ Vehicle: Бриз-40
 Category: Sea
 Weight: 15 tons
 Payload Weight: 3 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 12.0 m, Width: 4.0 m, Height: 3.0 m
 Speed: 90 km/h
 Manufacturer: Unknown
@@ -872,8 +866,6 @@ Vehicle: Кентавр
 Category: Sea
 Weight: 47 tons
 Payload Weight: 10 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 24.0 m, Width: 5.0 m, Height: 4.5 m
 Speed: 65 km/h
 Manufacturer: Kuznya na Rybalskomu
@@ -884,8 +876,6 @@ Vehicle: Гюрза-М
 Category: Sea
 Weight: 50 tons
 Payload Weight: 10 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 23.0 m, Width: 5.0 m, Height: 4.0 m
 Speed: 52 km/h
 Manufacturer: Kuznya na Rybalskomu
@@ -896,8 +886,6 @@ Vehicle: Богомол
 Category: Sea
 Weight: 400 tons
 Payload Weight: 50 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 60.0 m, Width: 10.0 m, Height: 15.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -908,8 +896,6 @@ Vehicle: Кайра-150
 Category: Sea
 Weight: 150 tons
 Payload Weight: 20 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 40.0 m, Width: 8.0 m, Height: 10.0 m
 Speed: 60 km/h
 Manufacturer: Unknown
@@ -920,8 +906,6 @@ Vehicle: Сарган
 Category: Sea
 Weight: 300 tons
 Payload Weight: 40 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 50.0 m, Width: 9.0 m, Height: 12.0 m
 Speed: 55 km/h
 Manufacturer: Unknown
@@ -932,8 +916,6 @@ Vehicle: PEARL-PC
 Category: Sea
 Weight: 100 tons
 Payload Weight: 15 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 30.0 m, Width: 7.0 m, Height: 8.0 m
 Speed: 70 km/h
 Manufacturer: Unknown
@@ -944,8 +926,6 @@ Vehicle: Корал
 Category: Sea
 Weight: 100 tons
 Payload Weight: 15 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 30.0 m, Width: 7.0 m, Height: 8.0 m
 Speed: 70 km/h
 Manufacturer: Unknown
@@ -956,8 +936,6 @@ Vehicle: PEARL USV
 Category: Sea
 Weight: 10 tons
 Payload Weight: 2 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 10.0 m, Width: 3.0 m, Height: 2.0 m
 Speed: 80 km/h
 Manufacturer: Unknown
@@ -968,8 +946,6 @@ Vehicle: Лань
 Category: Sea
 Weight: 400 tons
 Payload Weight: 50 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 60.0 m, Width: 10.0 m, Height: 15.0 m
 Speed: 50 km/h
 Manufacturer: Kuznya na Rybalskomu
@@ -980,8 +956,6 @@ Vehicle: МПК500
 Category: Sea
 Weight: 450 tons
 Payload Weight: 50 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 60.0 m, Width: 10.0 m, Height: 15.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1004,8 +978,6 @@ Vehicle: Веспа
 Category: Sea
 Weight: 500 tons
 Payload Weight: 60 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 65.0 m, Width: 11.0 m, Height: 15.0 m
 Speed: 60 km/h
 Manufacturer: Unknown
@@ -1016,8 +988,6 @@ Vehicle: PC655
 Category: Sea
 Weight: 2,500 tons
 Payload Weight: 200 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 100.0 m, Width: 15.0 m, Height: 20.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1028,8 +998,6 @@ Vehicle: Мусон
 Category: Sea
 Weight: 2,000 tons
 Payload Weight: 150 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 90.0 m, Width: 14.0 m, Height: 20.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1040,8 +1008,6 @@ Vehicle: Дозор
 Category: Sea
 Weight: 1,500 tons
 Payload Weight: 100 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 80.0 m, Width: 12.0 m, Height: 18.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1052,8 +1018,6 @@ Vehicle: Гайдук-M
 Category: Sea
 Weight: 2,000 tons
 Payload Weight: 150 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 90.0 m, Width: 14.0 m, Height: 20.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1064,8 +1028,6 @@ Vehicle: Касатка
 Category: Sea
 Weight: 2,500 tons
 Payload Weight: 200 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 100.0 m, Width: 15.0 m, Height: 20.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1076,8 +1038,6 @@ Vehicle: 58250
 Category: Sea
 Weight: 2,500 tons
 Payload Weight: 200 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 100.0 m, Width: 15.0 m, Height: 20.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1088,8 +1048,6 @@ Vehicle: Пелікан
 Category: Sea
 Weight: 50 tons
 Payload Weight: 10 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 20.0 m, Width: 5.0 m, Height: 4.0 m
 Speed: 60 km/h
 Manufacturer: Unknown
@@ -1100,8 +1058,6 @@ Vehicle: Кентавр-ЛК
 Category: Sea
 Weight: 47 tons
 Payload Weight: 10 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 24.0 m, Width: 5.0 m, Height: 4.5 m
 Speed: 65 km/h
 Manufacturer: Kuznya na Rybalskomu
@@ -1112,8 +1068,6 @@ Vehicle: Ондатра
 Category: Sea
 Weight: 20 tons
 Payload Weight: 5 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 15.0 m, Width: 4.0 m, Height: 3.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1124,8 +1078,6 @@ Vehicle: Тайпан
 Category: Sea
 Weight: 30 tons
 Payload Weight: 8 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 18.0 m, Width: 4.5 m, Height: 3.5 m
 Speed: 60 km/h
 Manufacturer: Unknown
@@ -1136,8 +1088,6 @@ Vehicle: Бобр
 Category: Sea
 Weight: 100 tons
 Payload Weight: 20 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 30.0 m, Width: 7.0 m, Height: 8.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1148,8 +1098,6 @@ Vehicle: Тритон
 Category: Sea
 Weight: 150 tons
 Payload Weight: 30 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 40.0 m, Width: 8.0 m, Height: 10.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1160,8 +1108,6 @@ Vehicle: Саламандра
 Category: Sea
 Weight: 150 tons
 Payload Weight: 30 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 40.0 m, Width: 8.0 m, Height: 10.0 m
 Speed: 50 km/h
 Manufacturer: Unknown
@@ -1172,8 +1118,6 @@ Vehicle: Агро-2000
 Category: Sea
 Weight: 200 tons
 Payload Weight: 50 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 50.0 m, Width: 10.0 m, Height: 12.0 m
 Speed: 40 km/h
 Manufacturer: Unknown
