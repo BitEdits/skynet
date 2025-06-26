@@ -2,8 +2,8 @@ PATH=$PATH:.
 
 rm -f skynet skynet_client skynet_decrypt skynet_encrypt skynet_keygen skynet.txt.sky skynet.txt.sky.dec
 
-INC="$(pkg-config --cflags openssl)" # -I
-LIB="$(pkg-config --libs openssl)"   # -L
+INC="$(pkg-config --cflags openssl)"
+LIB="$(pkg-config --libs openssl)"
 
 gcc $INC -o skynet skynet.c skynet_conv.c    skynet_proto.c $LIB
 gcc $INC -o skynet_client   skynet_client.c  skynet_proto.c $LIB
