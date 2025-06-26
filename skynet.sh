@@ -2,20 +2,20 @@ PATH=$PATH:.
 
 rm -f skynet skynet_client skynet_decrypt skynet_encrypt skynet_keygen skynet.txt.sky skynet.txt.sky.dec
 
-CFLAGS="$(pkg-config --cflags openssl)" # -I
-LDFLAGS="$(pkg-config --libs openssl)"  # -L
-
 if [[ "$(uname -s)" == "Darwin" ]]; then
-  LIBS=""
+  CRYPTO="crypto"
 else
-  LIBS=-lcrypto
+  CRYPTO="openssl"
 fi
 
-gcc $CFLAGS $LDFLAGS -o skynet skynet.c skynet_conv.c    skynet_proto.c $LIBS
-gcc $CFLAGS $LDFLAGS -o skynet_client   skynet_client.c  skynet_proto.c $LIBS
-gcc $CFLAGS $LDFLAGS -o skynet_decrypt  skynet_decrypt.c skynet_proto.c $LIBS
-gcc $CFLAGS $LDFLAGS -o skynet_encrypt  skynet_encrypt.c skynet_proto.c $LIBS
-gcc $CFLAGS $LDFLAGS -o skynet_keygen   skynet_keygen.c  skynet_proto.c $LIBS
+INC="$(pkg-config --cflags openssl)" # -I
+LIB="$(pkg-config --libs $CRYPTO)"   # -L
+
+gcc $INC -o skynet skynet.c skynet_conv.c    skynet_proto.c $LIB
+gcc $INC -o skynet_client   skynet_client.c  skynet_proto.c $LIB
+gcc $INC -o skynet_decrypt  skynet_decrypt.c skynet_proto.c $LIB
+gcc $INC -o skynet_encrypt  skynet_encrypt.c skynet_proto.c $LIB
+gcc $INC -o skynet_keygen   skynet_keygen.c  skynet_proto.c $LIB
 
 skynet_keygen npg_control      --server
 skynet_keygen npg_pli          --server

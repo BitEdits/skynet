@@ -1,3 +1,16 @@
+Vehicle: Nemesis
+Category: Air
+Weight: 0.100 tons
+Payload Weight: 0.020 tons
+Time Inflight: Data unavailable
+Altitude Range: 0-1,000 m
+Size: Length: 2.0 m, Width: 3.0 m, Height: 0.8 m
+Speed: 100 km/h
+Manufacturer: Unknown (Ukrainian development)
+Role: Strike and Reconnaissance UAV
+Status: Active
+Flight Range: 20 km
+
 Vehicle: Vampire
 Category: Air
 Weight: 0.030 tons
