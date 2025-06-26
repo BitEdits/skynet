@@ -579,7 +579,7 @@ Role: Tiltrotor Transport
 Status: Active
 
 Vehicle: MQ-9 Reaper
-Category: Air
+Category: Drone
 Weight: 2.2 tons
 Payload Weight: 1.7 tons
 Time Inflight: 27 hours
@@ -591,7 +591,7 @@ Role: UAV
 Status: Active
 
 Vehicle: RQ-4 Global Hawk
-Category: Air
+Category: Drone
 Weight: 6.7 tons
 Payload Weight: 1.4 tons
 Time Inflight: 34 hours
@@ -603,7 +603,7 @@ Role: Surveillance UAV
 Status: Active
 
 Vehicle: MQ-1C Gray Eagle
-Category: Air
+Category: Drone
 Weight: 1.6 tons
 Payload Weight: 0.5 tons
 Time Inflight: 25 hours
@@ -615,7 +615,7 @@ Role: UAV
 Status: Active
 
 Vehicle: RQ-7 Shadow
-Category: Air
+Category: Drone
 Weight: 0.2 tons
 Payload Weight: 0.05 tons
 Time Inflight: 9 hours
@@ -627,7 +627,7 @@ Role: Tactical UAV
 Status: Active
 
 Vehicle: RQ-11 Raven
-Category: Air
+Category: Drone
 Weight: 0.002 tons
 Payload Weight: 0.0004 tons
 Time Inflight: 1.5 hours
@@ -639,7 +639,7 @@ Role: Micro UAV
 Status: Active
 
 Vehicle: CQ-10 Snowgoose
-Category: Air
+Category: Drone
 Weight: 0.6 tons
 Payload Weight: 0.3 tons
 Time Inflight: 20 hours
@@ -651,7 +651,7 @@ Role: Cargo UAV
 Status: Active
 
 Vehicle: MQ-25 Stingray
-Category: Air
+Category: Drone
 Weight: 11 tons
 Payload Weight: 6.8 tons
 Time Inflight: 6 hours
@@ -663,7 +663,7 @@ Role: Aerial Refueling UAV
 Status: In Development
 
 Vehicle: X-47B
-Category: Air
+Category: Drone
 Weight: 6.3 tons
 Payload Weight: 2 tons
 Time Inflight: 6 hours

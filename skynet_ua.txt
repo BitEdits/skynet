@@ -1,5 +1,5 @@
 Vehicle: Nemesis
-Category: Air
+Category: Drone
 Weight: 0.100 tons
 Payload Weight: 0.020 tons
 Time Inflight: Data unavailable
@@ -12,20 +12,19 @@ Status: Active
 Flight Range: 20 km
 
 Vehicle: Vampire
-Category: Air
-Weight: 0.030 tons
-Payload Weight: 0.015 tons
-Time Inflight: Data unavailable
+Category: Drone
+Take-off Weight: 30 kg
+Time Inflight: 23-37 min
 Altitude Range: 0-400 m
 Size: Length: 1.2 m, Width: 1.2 m, Height: 0.5 m
-Speed: 40 km/h
+Speed: 90 km/h
 Manufacturer: SkyFall
 Role: Strike and Reconnaissance UAV
 Status: Active
 Flight Range: 10 km
 
 Vehicle: Mini SHARK
-Category: Air
+Category: Drone
 Weight: 0.005 tons
 Payload Weight: Data unavailable
 Time Inflight: 2 hours
@@ -38,20 +37,31 @@ Status: Active
 Flight Range: 30 km
 
 Vehicle: SHARK
-Category: Air
-Weight: 0.012 tons
-Payload Weight: Data unavailable
+Category: Drone
+Take-off Weight: 12.5 kg
 Time Inflight: 4 hours
 Altitude Range: 0-3,000 m
-Size: Length: 2.0 m, Wingspan: 4.0 m, Height: 0.6 m
-Speed: 120 km/h
+Size: Length: 1.65 m, Wingspan: 3.4 m, Height: 0.3 m
+Speed: 75-130 km/h
 Manufacturer: Ukrspecsystems
 Role: Reconnaissance and Fire Adjustment UAV
 Status: Active
 Flight Range: 80 km
 
+Vehicle: SHARK-M
+Category: Drone
+Take-off Weight: 12.5 kg
+Time Inflight: 4 hours
+Altitude Range: 0-3,000 m
+Size: Length: 1.65 m, Wingspan: 3.4 m, Height: 0.3 m
+Speed: 75-130 km/h
+Manufacturer: Ukrspecsystems
+Role: Reconnaissance and Fire Adjustment UAV
+Status: Active
+Flight Range: 180 km
+
 Vehicle: PD-2
-Category: Air
+Category: Drone
 Weight: 0.055 tons
 Payload Weight: 0.003 tons
 Time Inflight: 8 hours
@@ -64,7 +74,7 @@ Status: Active
 Flight Range: 180 km
 
 Vehicle: Ан-196 Лютий
-Category: Air
+Category: Drone
 Weight: 0.275 tons
 Payload Weight: 0.075 tons
 Time Inflight: Data unavailable
@@ -80,34 +90,8 @@ Vehicle: Фантом
 Category: Ground
 Weight: 0.15 tons
 Payload Weight: 0.05 tons
-Time Inflight: Not applicable
-Altitude Range: Not applicable
 Size: Length: 1.5 m, Width: 0.8 m, Height: 0.5 m
 Speed: 60 km/h
-Manufacturer: Unknown
-Role: Unmanned Ground Vehicle
-Status: In Development
-
-Vehicle: ЛАСКА
-Category: Ground
-Weight: Data unavailable
-Payload Weight: Data unavailable
-Time Inflight: Not applicable
-Altitude Range: Not applicable
-Size: Data unavailable
-Speed: Data unavailable
-Manufacturer: Unknown
-Role: Unmanned Ground Vehicle
-Status: In Development
-
-Vehicle: TerMIT
-Category: Ground
-Weight: Data unavailable
-Payload Weight: Data unavailable
-Time Inflight: Not applicable
-Altitude Range: Not applicable
-Size: Data unavailable
-Speed: Data unavailable
 Manufacturer: Unknown
 Role: Unmanned Ground Vehicle
 Status: In Development
