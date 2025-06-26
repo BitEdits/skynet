@@ -2,14 +2,8 @@ PATH=$PATH:.
 
 rm -f skynet skynet_client skynet_decrypt skynet_encrypt skynet_keygen skynet.txt.sky skynet.txt.sky.dec
 
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  CRYPTO="crypto"
-else
-  CRYPTO="openssl"
-fi
-
 INC="$(pkg-config --cflags openssl)" # -I
-LIB="$(pkg-config --libs $CRYPTO)"   # -L
+LIB="$(pkg-config --libs openssl)"   # -L
 
 gcc $INC -o skynet skynet.c skynet_conv.c    skynet_proto.c $LIB
 gcc $INC -o skynet_client   skynet_client.c  skynet_proto.c $LIB
