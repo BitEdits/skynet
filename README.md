@@ -11,6 +11,7 @@ in pure C99 with a single OpenSSL dependency (to be replaced in real applcations
 
 * [1] <a href="https://github.com/BitEdits/skynet/">Namdak Tonpa. Skynet Github Open Source Link32 Implementation</a>. 2025.
 * [2] <a href="https://BitEdits.github.io/skynet/skynet.pdf">Namdak Tonpa. A Tactical Communication Protocol Link32  and Skynet Reference Implementation  for Affordable LTE 4G-based  Drone Swarm Coordination in Cluster Hybrid Topologies</a>. 2025.
+* [3] <a href="https://groupoid.space/books/vol4/pde.pdf">Namdak Tonpa. Theory and Applications of Differential Equations.</a> 2025.
 
 ## Properties
 
