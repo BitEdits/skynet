@@ -1113,7 +1113,14 @@ apn_protocol = ipv4
 
 \section{Swarm Modeling and Simulation Architecture}
 
-The simulation of large-scale drone swarms, as implemented in the Skynet/Link32 protocol, requires efficient and scalable numerical models to capture the dynamics of 256 to 50,000 drones operating in a shared environment. Two complementary approaches are employed: a discrete ordinary differential equation (ODE) model for individual drone tracking and a continuum partial differential equation (PDE) model for approximating swarm behavior as a density field. These models are implemented in the \texttt{skynet\_ode.c} and \texttt{skynet\_pde.c} codes, respectively, using the PETSc library for parallel numerical computations. This section describes the modeling approaches and the architectural details of the simulation codes.
+The simulation of large-scale drone swarms, as implemented in the Link32 protocol,
+requires efficient and scalable numerical models to capture the dynamics of 256 to
+50,000 drones operating in a shared environment. Two complementary approaches are
+employed: a discrete ordinary differential equation (ODE) model for individual
+drone tracking and a continuum partial differential equation (PDE) model for
+approximating swarm behavior as a density field. These models are implemented
+in the \texttt{skynet\_ode.c} and \texttt{skynet\_pde.c} codes, respectively,
+using the PETSc library for parallel numerical computations.
 
 \subsection{Swarm Modeling Approaches}
 
