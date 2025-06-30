@@ -1162,11 +1162,12 @@ The \texttt{skynet\_ode.c} code simulates the discrete ODE model for individual 
     \item \textbf{RHS Function}: The \texttt{RHSFunction} computes the time derivatives $\frac{d x_i}{dt} = v_i$ and $\frac{d v_i}{dt} = u_i + f_{env,i} + f_{swarm,i}$, incorporating repulsion terms to prevent collisions and Skynet/Link32 control inputs (currently a placeholder, to be updated with UDP-parsed signals).
     \item \textbf{Solver}: The PETSc \texttt{TS} solver with the explicit Runge-Kutta method (\texttt{TSRK}) advances the solution with a time step $\Delta t = 0.1$. The simulation runs for a short duration (e.g., 1 second) to ensure stability during testing.
     \item \textbf{Initialization}: Drones are initialized with random positions in a domain (e.g., [0, 10]) using \texttt{PetscRandom}, with zero initial velocities.
-    \item \textbf{Output}: The final state is written to \texttt{swarm\_ode\_output.txt}, containing position and velocity pairs for each drone (e.g., 34 values for 17 drones).
+    \item \textbf{Output}: The final state is written to \texttt{skynet\_ode.txt}, containing position and velocity pairs for each drone (e.g., 34 values for 17 drones).
     \item \textbf{Parallelism}: The code supports MPI parallelism, distributing drones across processes, though the test output indicates a single process, suggesting a configuration to be optimized for larger swarms.
 \end{itemize}
 
-The code is designed for scalability, with plans to increase $N$ to 256 or 50,000 drones by optimizing MPI distribution and integrating Skynet/Link32 control logic.
+The code is designed for scalability, with plans to increase $N$ to 256
+or 50,000 drones by optimizing MPI distribution and integrating Skynet/Link32 control logic.
 
 \subsubsection{\texttt{skynet\_pde.c} Architecture}
 The \texttt{skynet\_pde.c} code implements the continuum PDE model on a 2D grid. Its architecture includes:
@@ -1176,7 +1177,7 @@ The \texttt{skynet\_pde.c} code implements the continuum PDE model on a 2D grid.
     \item \textbf{RHS Function}: The \texttt{RHSFunction} computes the time derivatives: $\frac{\partial \rho}{\partial t} = -\nabla \cdot (\rho u_x)$ using finite differences, and $\frac{\partial u_x}{\partial t} = f_{control} + f_{env}$, with $f_{control}$ as a placeholder for Skynet/Link32 inputs.
     \item \textbf{Solver}: The PETSc \texttt{TS} solver with the explicit Runge-Kutta method (\texttt{TSRK}) advances the solution with $\Delta t = 0.01$. The simulation runs for a short time (e.g., 0.1 seconds) to verify stability.
     \item \textbf{Initialization}: The density $\rho$ is initialized as a Gaussian blob centered at (50, 50) in a $100 \times 100$ domain, $\rho(x, y) = e^{-((x-50)^2 + (y-50)^2)/10}$, with zero initial velocity.
-    \item \textbf{Output}: The final state is written to \texttt{swarm\_output.txt}, containing density and velocity values (e.g., 200 values for a $10 \times 10 \times 2$ grid).
+    \item \textbf{Output}: The final state is written to \texttt{skynet\_pde.txt}, containing density and velocity values (e.g., 200 values for a $10 \times 10 \times 2$ grid).
     \item \textbf{Parallelism}: The \texttt{DMDA} structure supports MPI parallelism, distributing the grid across processes, though the test output indicates a single process, requiring optimization for larger grids.
 \end{itemize}
 
