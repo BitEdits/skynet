@@ -41,7 +41,7 @@ PetscErrorCode RHSFunction(TS ts, PetscReal t, Vec X, Vec F, void *ctx) {
 int main(int argc, char **argv) {
   PetscInitialize(&argc, &argv, NULL, NULL);
   AppCtx ctx;
-  ctx.N = 16; // Start with small number for testing
+  ctx.N = 160; // Start with small number for testing
   ctx.dt = 0.1; // Larger time step
 
   Vec X, F;
