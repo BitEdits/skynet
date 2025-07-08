@@ -245,7 +245,7 @@ void server_init(ServerState *state, char *node_name) {
         skynet_convergence_schedule_slots_qos(state->qos_slots, state->slots, state->qos_slot_count, SLOT_COUNT);
         state->slots_assigned = true;
         for (uint32_t i = 0; i < state->qos_slot_count; i++) {
-            printf("%sInitial: Assigned %u slots to NPG %u (QoS %u).%s\n", CYAN,
+            printf("%sAssigned %u slots to NPG %u (QoS %u).%s\n", CYAN,
                    state->qos_slots[i].slot_count, state->qos_slots[i].npg_id, state->qos_slots[i].qos, RESET);
         }
     }

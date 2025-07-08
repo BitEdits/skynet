@@ -1,0 +1,126 @@
+<html><head><meta charset="utf-8" /><meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="" /><meta name="author" content="Maxim Sokhatsky" /><title>SKYNET</title>
+    <link rel="stylesheet" href="https://n2o.dev/blank.css" />
+    <link rel="stylesheet" href="https://n2o.dev/zima.css" />
+    <link rel="stylesheet" href="https://n2o.dev/pro/pro.css" />
+</head><body><nav>
+    <a href="https://erp.uno/en/">ERP</a>
+    <a href="https://mq.erp.uno" style="background:#ededed;">SKYNET</a>
+</nav><header>
+    <a href="https://github.com/bitedits/skynet"><img src="https://openmoji.org/data/color/svg/1F4DF.svg"/></a>
+    <h1>SKYNET</h1>
+</header><aside>
+    <article>
+        <section>
+            <h3>SYNOPSIS</h3>
+            <div>Synrc Skynet is a specialized distribution application for drone swarm coordination
+                 implementing Link32 tactical battlefield protocol inspired by VMF, TSM, SRW formats
+                 with MQTT and LTE 4G (HSS, PDCP, QCI) protocol stacks designed for military
+                 applications requiring low-latency, secure, and scalable data exchange in
+                 contested environments. It supports swarm coordination, real-time position
+                 location information (PLI), command and control (C2), and tactical chat over
+                 UDP-based multicast networks.
+            </div>
+        </section>
+        <section>
+            <h3>FEATURES</h3>
+            <div><ul><li>AES-256-GCM</li>
+                     <li>ECDH</li>
+                     <li>SECP384R1</li>
+                     <li>CMPXCHG CAS</li>
+                     <li>UDP</li>
+                     <li>MULTICAST</li>
+                     <li>LTE (srsRAN-4G)</li>
+                     <li>FN1V</li></ul></div>
+            <br />
+            <div>
+                JUN 2025 © 5HT ISC | VER 1.0
+            </div>
+        </section>
+        <section>
+            <h3>PAPERS</h3>
+            <div>
+                <ul><li><a href="https://bitedits.github.io/skynet/skynet.pdf">SKYNET.PDF</a> </li>
+                    <li><a href="https://groupoid.space/books/vol4/pde.pdf">PDE.PDF</a> </li>
+                </ul>
+            </div>
+        </section>
+    </article>
+</aside><main>
+
+    <section>
+        <a name="js"></a><h3>SKYNET</h3>
+
+        <p>Skynet command line interface (CLI) is set of POSIX tools running Synrc real-time system (RTS),
+           a NuttX derivative work like Sony Spresense.</p>
+
+        <h4>KEYGEN</h4>
+
+        <p>Generates ECC secp384r1 key pairs for the specified node, storing them in ~/.skynet/ecc/secp384r1/ (server) or ~/.skynet_client/ecc/secp384r1/ (client).</P>
+
+        <figure>
+        <code>skynet_keygen &lt;node> [--server|--client]</code>
+        </figure>
+
+        <h4>ENCRYPT</h4>
+
+        <p>Encrypts a test message from &lt;sender> to &lt;recipient> for the specified NPG, producing &lt;npg_id>.sky.</P>
+
+        <figure>
+        <code>skynet_encrypt &lt;sender> &lt;recipient> &lt;file></code>
+        </figure>
+
+        <h4>DECRYPT</h4>
+
+        <p>Decrypts &lt;file> (e.g., &lt;npg_id>.sky) using keys for &lt;sender> and &lt;recipient>.</P>
+
+        <figure>
+        <code>skynet_decrypt &lt;sender> &lt;recipient> &lt;file.sky></code>
+        </figure>
+
+        <h4>SERVER</h4>
+
+        <p>Runs the server named as <node>, FNV1A 32-bit hash is used. The server assigns a slot, forwards status messages to 239.255.1.<slot_id>, and logs all activity.</P>
+
+        <figure>
+        <code>skynet &ltnode></code>
+        </figure>
+
+        <h4>CLIENT</h4>
+
+        <p>Runs the client named as <node>, FNV1A 32-bit hash is used. The client sends key exchange, slot request, and status messages.</P>
+
+        <figure>
+        <code>skynet_client &ltnode></code>
+        </figure>
+
+        <figure>
+        </figure>
+
+        <h4>SIM FLASH (PCSC/CCUD) and eSIM QR generator</h4>
+
+        <p>Utility to flash SIM cards for srsRAN setups with PC/SC and CCID support.
+           It uses libpcsclite, libusb-1.0 as dependencies and supports
+           PCSC (OMNIKEY, ACR38U), CCID devices (Автор).</p>
+
+        <figure>
+        <code>./skynet_sim &ltdevice> &ltconfig_file> [--esim &ltfile>]</code>
+        </figure>
+
+        <h4>eSIM SM-DP+ server for iOS</h4>
+
+        <p>Lightweight SM-DP+ server for eSIM profile delivery in srsRAN 4G.
+           Generates GSMA-compliant eSIM profiles for iPhone SE 5G.</p>
+
+        <figure>
+        <code>./skynet_sim &ltdevice> &ltconfig_file> [--esim &ltfile>]</code>
+        </figure>
+
+        <br /><br />
+
+    </section>
+
+</main><footer>
+    Made with <span class="heart">❤</span> to Skynet/RTS
+</footer></body></html>
