@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SKYNET Link32 — Battlefield LTE Swarm Command</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Turn any LTE 4G network into a hardened C2 backbone for 5 000 drones — < 50 ms latency, AES-256-GCM, <$10k CAPEX.">
+  <link rel="stylesheet" href="skynet.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Fira+Code:wght@400&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+</head>
+
+<body>
+  <!-- HERO -->
+  <header class="hero">
+    <div class="container">
+      <span class="badge">LINK32 CLASSIFIED // OpenSSL UNCLASSIFIED</span>
+      <h1>SKYNET <span>Link32</span></h1>
+      <p class="tagline">Turn any LTE 4G cell into a sub-50 ms, encrypted command backbone
+          for 1K drone swarms limited with 30km and $100K BOM.</p>
+      <div class="cta-row">
+        <a href="https://bitedits.github.io/skynet/skynet.pdf" class="btn primary">Skynet White-Paper PDF</a>
+        <a href="https://groupoid.space/books/vol4/pde.pdf" class="btn primary">Swarm Models Research PDF</a>
+        <a href="https://github.com/bitedits/skynet" class="btn secondary">Clone & Deploy</a>
+      </div>
+    </div>
+  </header>
+
+
+<!--  VALUE PROPS  (asymmetric masonry)  -->
+<section class="masonry-grid" id="value">
+  <div class="brick w2"><h3>Pixhawk + RP2350</h3><p>RTOS-grade flight stack on dual-core Cortex-M33 + vector unit.</p></div>
+  <div class="brick h2"><h3>1 000 Drones / eSIM</h3><p>GSMA-compliant SM-DP+ server provisions profiles over-the-air.</p></div>
+  <div class="brick w2"><h3>LoRa SDR Client</h3><p>Sub-GHz spread-spectrum; 40 km range at 250 kbps.</p></div>
+  <div class="brick h2"><h3>1× Starlink Backhaul</h3><p>220 Mbps symmetric; 20 ms to ground C2.</p></div>
+  <div class="brick w2"><h3>BladeRF Mesh</h5><p>5 leader drones carry BladeRF micro 2×2 MIMO; base station BladeRF xA9 with 4× high-gain antennas.</p></div>
+</section>
+
+  <!-- PROTOCOL SNAPSHOT -->
+  <section class="code-block" id="protocol">
+    <div class="container">
+      <h2>S-Message</h2>
+      <p>S-Message (Link32) has 32-Byte header. We use Snowflake for node identification,
+         SeqNo for deduplication (on QoS=1) and LDAP for drone registry (OTA provisioning).</p><br>
+      <pre><code class="language-c">typedef struct {
+  uint8_t  version:4, type:4, qos:4, hop:4;
+  uint32_t npg_id;      // 1-103 topic
+  uint32_t node_id;     // FNV-1a hash
+  uint32_t seq_no;      // anti-replay
+  uint8_t  iv[16];      // AES-GCM nonce
+  uint16_t payload_len;
+  uint8_t  payload[];   // encrypted + 16 B tag
+} SkyNetMessage;</code></pre>
+    </div>
+  </section>
+
+  <!-- DEPLOYMENT STEPS -->
+  <section class="steps" id="deploy">
+    <div class="container">
+      <h2>Swarm Deploy</h2>
+      <ol>
+        <li><strong>Clone</strong><br><code>git clone https://github.com/bitedits/skynet && cd skynet</code></li>
+        <li><strong>Build</strong><br><code>make</code> (needs GCC &amp; OpenSSL)</li>
+        <li><strong>Generate Keys</strong><br><code>./skynet.sh</code> (256 ECC pairs)</li>
+        <li><strong>Launch eNB/EPC</strong><br><code>srsenb -c enb.conf &amp;</code><br><code>srsmbd -c epc.conf &amp;</code></li>
+        <li><strong>Start Swarm Broker</strong><br><code>./skynet server</code></li>
+      </ol>
+    </div>
+  </section>
+
+<section class="cost-table" id="bom">
+  <div class="container">
+    <h2>Bill of Materials</h2>
+    <table>
+      <thead>
+        <tr><th>Item</th><th>Qty</th><th>Unit&nbsp;$</th><th>Subtotal&nbsp;$</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Pixhawk 6C + RP2350 flight controller</td><td>1 000</td><td>65</td><td>65 000</td></tr>
+        <tr><td>LoRa SDR modem (RF95 + RP2350)</td><td>1 000</td><td>18</td><td>18 000</td></tr>
+        <tr><td>BladeRF micro 2.0 (leader drones)</td><td>5</td><td>550</td><td>2 750</td></tr>
+        <tr><td>BladeRF xA9 (base-station)</td><td>1</td><td>1 100</td><td>1 100</td></tr>
+        <tr><td>17 dBi sector antennas</td><td>4</td><td>180</td><td>720</td></tr>
+        <tr><td>eSIM profiles (GSMA SM-DP+)</td><td>1 000</td><td>3</td><td>3 000</td></tr>
+        <tr><td>Starlink Flat-High-Performance</td><td>1</td><td>2 500</td><td>2 500</td></tr>
+        <tr><td>Starlink service (12 mo)</td><td>1</td><td>500</td><td>6 000</td></tr>
+        <tr><th colspan="3">TOTAL CAPEX</th><th>$98 070</th></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+  <!-- CTA -->
+  <footer>
+    <div class="container">
+      <h2>Want to Develop Skynet?</h2>
+      <h3>Explore the main Skynet target first:</h3><br>
+      <a href="https://bitedits.github.io/rts/" class="btn primary big">BitEdits RTS</a>
+      <p>Questions? Contact <a href="mailto:root@5ht.co">root@5ht.co</a></p>
+    </div>
+  </footer>
+</body>
+</html>
